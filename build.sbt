@@ -1,5 +1,7 @@
 val scala3Version = "3.3.0"
 
+lazy val zioVersion = "2.0.13"
+
 lazy val root = project
   .in(file("."))
   .settings(
@@ -8,5 +10,10 @@ lazy val root = project
 
     scalaVersion := scala3Version,
 
-    libraryDependencies += "dev.zio" %% "zio" % "2.0.13"
+    libraryDependencies ++= List(
+      "dev.zio" %% "zio" % zioVersion,
+      "dev.zio" %% "zio-streams" % zioVersion,
+      "dev.zio" %% "zio-test" % zioVersion % Test,
+      "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
+    )
   )
