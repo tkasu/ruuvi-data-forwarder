@@ -32,7 +32,7 @@ object AppSpec extends ZIOSpecDefault:
         Assertion.hasSameElements(
           Vector(
             testLine1,
-            testLine2,
+            testLine2
           )
         )
       )

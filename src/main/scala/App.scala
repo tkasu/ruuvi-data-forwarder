@@ -5,7 +5,10 @@ import sources.*
 
 object App extends ZIOAppDefault:
 
-  def forwarder(sourceCreator: SensorValuesSource, sinkCreator: SensorValuesSink) =
+  def forwarder(
+      sourceCreator: SensorValuesSource,
+      sinkCreator: SensorValuesSink
+  ) =
     val source = sourceCreator.make
     val sink = sinkCreator.make
     (source >>> sink).forever
