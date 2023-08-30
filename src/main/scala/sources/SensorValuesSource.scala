@@ -1,6 +1,7 @@
 package sources
 
+import dto.RuuviTelemetry
 import zio.stream.ZStream
 
 trait SensorValuesSource:
-  def make: ZStream[Any, Throwable, String]
+  def make: ZStream[Any, SourceError, RuuviTelemetry]

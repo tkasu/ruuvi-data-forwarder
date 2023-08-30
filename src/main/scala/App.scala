@@ -11,10 +11,14 @@ object App extends ZIOAppDefault:
   ) =
     val source = sourceCreator.make
     val sink = sinkCreator.make
-    (source >>> sink).forever
+    (source >>> sink).catchSome { case e: RuuviParseError =>
+      Console.printLineError(s"Error: ${e.getMessage}")
+    }.forever
 
   def run = for
     _ <- Console.printLine("Reading StdIn")
     _ <- forwarder(ConsoleSensorValuesSource, ConsoleSensorValuesSink)
-    _ <- Console.printLine("Reading done")
+      .catchSome { case _: StreamShutdown =>
+        Console.printLine("Reading done")
+      }
   yield ()

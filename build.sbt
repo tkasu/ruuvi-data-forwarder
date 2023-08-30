@@ -12,6 +12,7 @@ lazy val root = project
 
     libraryDependencies ++= List(
       "dev.zio" %% "zio" % zioVersion,
+      "dev.zio" %% "zio-json" % "0.6.1",
       "dev.zio" %% "zio-streams" % zioVersion,
       "dev.zio" %% "zio-test" % zioVersion % Test,
       "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
