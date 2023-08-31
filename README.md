@@ -28,7 +28,7 @@ sbt assembly
 Test input:
 
 ```shell
-echo '{"battery_potential":2335,"humidity":653675,"mac_address":[254,38,136,122,102,102],"measurement_sequence_number":53300,"movement_counter":2,"pressure":100755,"temperature_millicelsius":-29020,"tx_power":4}' | java -jar target/scala-3.3.0/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+echo '{"battery_potential":2335,"humidity":653675,"measurement_ts_ms":1693460525701,"mac_address":[254,38,136,122,102,102],"measurement_sequence_number":53300,"movement_counter":2,"pressure":100755,"temperature_millicelsius":-29020,"tx_power":4}' | java -jar target/scala-3.3.0/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 With [ruuvi-reader-rs](https://github.com/tkasu/ruuvi-reader-rs)

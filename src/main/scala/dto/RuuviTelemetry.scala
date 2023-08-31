@@ -11,6 +11,7 @@ case class RuuviTelemetry(
     txPower: Int,
     movementCounter: Int,
     measurementSequenceNumber: Int,
+    measurementTsMs: Long,
     macAddress: Seq[Short]
 )
 
