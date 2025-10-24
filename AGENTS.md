@@ -6,7 +6,7 @@
 
 **Status:** Active Development
 
-**Language:** Scala 3.5.2
+**Language:** Scala 3.6.2
 
 **Framework:** ZIO 2.1.14 (Functional Effect System)
 
@@ -172,8 +172,8 @@ Same JSON format with snake_case field names (validated and re-serialized):
 ### Prerequisites
 
 1. **Java Development Kit (JDK)**
-   - Tested with JDK 20
-   - Any JDK 11+ should work
+   - Tested with JDK 21 (LTS)
+   - Any JDK 21+ should work
    ```bash
    java -version
    ```
@@ -214,34 +214,34 @@ sbt scalafmtAll
 ```
 
 **Build Output:**
-- Assembly JAR: `target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar`
+- Assembly JAR: `target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar`
 
 ### Running
 
 **Console Sink (default):**
 ```bash
 # With test data
-echo '{"battery_potential":2335,"humidity":653675,"measurement_ts_ms":1693460525701,"mac_address":[254,38,136,122,102,102],"measurement_sequence_number":53300,"movement_counter":2,"pressure":100755,"temperature_millicelsius":-29020,"tx_power":4}' | java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+echo '{"battery_potential":2335,"humidity":653675,"measurement_ts_ms":1693460525701,"mac_address":[254,38,136,122,102,102],"measurement_sequence_number":53300,"movement_counter":2,"pressure":100755,"temperature_millicelsius":-29020,"tx_power":4}' | java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # With ruuvi-reader-rs (live data)
-../ruuvi-reader-rs/target/release/ruuvi-reader-rs | java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+../ruuvi-reader-rs/target/release/ruuvi-reader-rs | java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # With file input
-cat test-data.jsonl | java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+cat test-data.jsonl | java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 **JSON Lines Sink:**
 ```bash
 # Write to default path (data/telemetry.jsonl)
-RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # With custom path
 RUUVI_SINK_TYPE=jsonlines RUUVI_JSONLINES_PATH=/var/log/ruuvi/data.jsonl \
-  java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+  java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # Disable debug logging
 RUUVI_SINK_TYPE=jsonlines RUUVI_JSONLINES_DEBUG_LOGGING=false \
-  java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+  java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 ### Testing
@@ -450,7 +450,7 @@ sbt scalafmtCheckAll test
 ```bash
 # Ensure assembly completed
 sbt clean assembly
-ls -lh target/scala-3.3.0/*assembly*.jar
+ls -lh target/scala-3.*/*assembly*.jar
 ```
 
 ## Future Enhancements
