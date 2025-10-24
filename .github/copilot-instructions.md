@@ -13,8 +13,6 @@ This is a Scala 3 application using ZIO (functional effect system) that processe
 - **Effect System:** ZIO 2.1.14 for functional effects, async operations, and resource management
 - **Streams:** ZIO Streams 2.1.14 for reactive stream processing with backpressure
 - **JSON:** ZIO-JSON 0.7.3 for compile-time JSON codec derivation
-- **Configuration:** ZIO Config 4.0.2 with Typesafe Config (HOCON format)
-- **Logging:** ZIO Logging 2.3.2 with SLF4J2 backend + Logback 1.5.6
 - **Build Tool:** SBT 1.9.4
 - **Testing:** ZIO-Test 2.1.14
 - **Code Formatting:** Scalafmt 3.x (Scala 3 dialect, 2-space indentation, 120 char line width)
@@ -30,9 +28,6 @@ This is a Scala 3 application using ZIO (functional effect system) that processe
 ```
 src/main/scala/
 ├── App.scala                           # Main application entry point
-├── config/                             # Configuration models
-│   ├── AppConfig.scala                 # Main app configuration
-│   └── SinkConfig.scala                # Sink configuration
 ├── dto/
 │   └── RuuviTelemetry.scala           # Data model with JSON codecs
 ├── sources/
@@ -41,13 +36,10 @@ src/main/scala/
 │   └── SourceError.scala              # Error ADT
 └── sinks/
     ├── SensorValuesSink.scala         # Sink trait
-    ├── ConsoleSensorValuesSink.scala  # Stdout implementation
-    └── JsonLinesSensorValuesSink.scala # JSON Lines file sink
+    └── ConsoleSensorValuesSink.scala  # Stdout implementation
 
 src/test/scala/
-├── AppSpec.scala                      # Integration tests
-└── sinks/
-    └── JsonLinesSensorValuesSinkSpec.scala # Unit tests
+└── AppSpec.scala                      # Integration tests
 ```
 
 ## Build & Test Commands
@@ -156,7 +148,7 @@ case class RuuviTelemetry(
   movementCounter: Int,
   measurementSequenceNumber: Int,
   measurementTsMs: Long,
-  macAddress: Chunk[Int]
+  macAddress: Seq[Short]
 )
 ```
 
@@ -164,22 +156,16 @@ case class RuuviTelemetry(
 
 ## Configuration
 
-Configuration is loaded from `src/main/resources/application.conf` using ZIO Config with HOCON format. Environment variables can override config values.
+Currently, the application uses simple console-based input/output. Future versions will support configuration files.
 
-**Example:**
-```hocon
-ruuvi-data-forwarder {
-  sink {
-    sink-type = "console"
-    sink-type = ${?RUUVI_SINK_TYPE}
-  }
-}
-```
+**Current behavior:**
+- Reads JSON from stdin (console input)
+- Writes JSON to stdout (console output)
 
-**Environment variables:**
-- `RUUVI_SINK_TYPE` - Sink type: `console` or `jsonlines`
-- `RUUVI_JSONLINES_PATH` - Output file path for JSON Lines sink
-- `RUUVI_JSONLINES_DEBUG_LOGGING` - Enable/disable debug logging
+**Future enhancements:**
+- Configuration file support (HOCON format)
+- Environment variable overrides
+- Multiple sink types (HTTP, S3, Database)
 
 ## Adding New Features
 
@@ -194,10 +180,10 @@ ruuvi-data-forwarder {
 3. Use `ZSink.foreach` for per-element processing
 
 ### Adding Configuration
-1. Add case class in `config/` package
-2. Use ZIO Config automatic derivation
-3. Add HOCON config in `application.conf`
-4. Document environment variable overrides
+1. Add configuration dependencies to `build.sbt` (e.g., ZIO Config)
+2. Create configuration case classes in a `config/` package
+3. Add configuration file in `src/main/resources/`
+4. Update application to load and use configuration
 
 ## Testing Guidelines
 
@@ -230,16 +216,16 @@ All jobs must pass for PR approval.
 make build-assembly
 
 # With test data
-echo '{"battery_potential":2335,...}' | java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+echo '{"battery_potential":2335,...}' | java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # With stdin source
 make run
 ```
 
 ### Debugging
-- Check logs in console output (Logback configured in `src/main/resources/logback.xml`)
+- Check output in console (stdout/stderr)
 - Use ZIO's built-in tracing and logging features
-- Enable debug logging for specific components via Logback configuration
+- Add debug print statements with `ZIO.debug(message)` for troubleshooting
 
 ## Documentation
 
