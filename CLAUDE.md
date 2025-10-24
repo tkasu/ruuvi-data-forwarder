@@ -2,13 +2,13 @@
 
 ## Overview
 
-**ruuvi-data-forwarder** is a Scala 3 application built with ZIO that acts as middleware in the Ruuvitag telemetry pipeline. It processes sensor data from various sources and forwards it to configurable targets (HTTP endpoints, S3, databases, etc.). Currently implements stdin-to-stdout forwarding with JSON validation.
+**ruuvi-data-forwarder** is a Scala 3 application built with ZIO that acts as middleware in the Ruuvitag telemetry pipeline. It processes sensor data from various sources and forwards it to configurable targets. Currently implements Console (stdout) and JSON Lines (file) sinks with full configuration support.
 
-**Status:** Work in Progress (WIP)
+**Status:** Active Development
 
-**Language:** Scala 3.3.0
+**Language:** Scala 3.5.2
 
-**Framework:** ZIO 2.0.13 (Functional Effect System)
+**Framework:** ZIO 2.1.14 (Functional Effect System)
 
 ## Purpose
 
@@ -23,12 +23,14 @@ This utility serves as the data processing and routing layer by:
 
 ### Tech Stack
 
-- **Effect System:** ZIO 2.0.13 (functional effects, async, resource management)
-- **Streams:** ZIO Streams 2.0.13 (reactive stream processing)
-- **JSON:** ZIO-JSON 0.6.1 (compile-time JSON codec derivation)
+- **Effect System:** ZIO 2.1.14 (functional effects, async, resource management)
+- **Streams:** ZIO Streams 2.1.14 (reactive stream processing)
+- **JSON:** ZIO-JSON 0.7.3 (compile-time JSON codec derivation)
+- **Configuration:** ZIO Config 4.0.2 with Typesafe Config support
+- **Logging:** ZIO Logging 2.3.2 with SLF4J2 backend + Logback 1.5.6
 - **Build Tool:** SBT 1.9.4
-- **Testing:** ZIO-Test 2.0.13
-- **Plugins:** sbt-assembly (fat JAR), sbt-scalafmt (code formatting)
+- **Testing:** ZIO-Test 2.1.14
+- **Plugins:** sbt-assembly 2.1.1 (fat JAR), sbt-scalafmt 2.5.0 (code formatting)
 
 ### Project Structure
 
@@ -36,40 +38,58 @@ This utility serves as the data processing and routing layer by:
 ruuvi-data-forwarder/
 ├── src/
 │   ├── main/scala/
-│   │   ├── App.scala                           # Main application entry (24 lines)
+│   │   ├── App.scala                           # Main application entry
+│   │   ├── config/                             # Configuration models
+│   │   │   ├── AppConfig.scala                 # Main app config
+│   │   │   └── SinkConfig.scala                # Sink configuration
 │   │   ├── dto/
-│   │   │   └── RuuviTelemetry.scala            # Data model (22 lines)
+│   │   │   └── RuuviTelemetry.scala            # Data model
 │   │   ├── sources/
-│   │   │   ├── SensorValuesSource.scala        # Source trait (7 lines)
-│   │   │   ├── ConsoleSensorValuesSource.scala # Stdin implementation (18 lines)
-│   │   │   └── SourceError.scala               # Error ADT (11 lines)
+│   │   │   ├── SensorValuesSource.scala        # Source trait
+│   │   │   ├── ConsoleSensorValuesSource.scala # Stdin implementation
+│   │   │   └── SourceError.scala               # Error ADT
 │   │   └── sinks/
-│   │       ├── SensorValuesSink.scala          # Sink trait (7 lines)
-│   │       └── ConsoleSensorValuesSink.scala   # Stdout implementation (10 lines)
+│   │       ├── SensorValuesSink.scala          # Sink trait
+│   │       ├── ConsoleSensorValuesSink.scala   # Stdout implementation
+│   │       └── JsonLinesSensorValuesSink.scala # JSON Lines file sink
+│   ├── main/resources/
+│   │   ├── application.conf                     # Configuration (HOCON)
+│   │   └── logback.xml                          # Logging configuration
 │   └── test/scala/
-│       └── AppSpec.scala                       # Integration test (64 lines)
+│       ├── AppSpec.scala                       # Integration test
+│       └── sinks/
+│           └── JsonLinesSensorValuesSinkSpec.scala # Sink unit tests
+├── data/                                        # Default output directory
+│   └── .gitkeep                                 # Keep directory in git
 ├── build.sbt                                    # Build configuration
 ├── project/
 │   ├── build.properties                         # SBT version 1.9.4
 │   └── plugins.sbt                              # sbt-assembly, sbt-scalafmt
+├── Makefile                                     # Build & test commands
 ├── .scalafmt.conf                               # Scala 3 formatting rules
+├── .gitignore                                   # Git ignore rules
 └── README.md                                    # Usage documentation
 ```
 
 ### Key Components
 
-**App.scala:24** - Main application
+**App.scala** - Main application
 - `forwarder()` - Core pipeline that:
   1. Takes a source stream and a sink
   2. Pipes telemetry data through the sink
-  3. Catches `RuuviParseError` and logs errors
+  3. Catches `RuuviParseError` and logs errors with ZIO logging
   4. Runs forever until stream completes
 
+- `selectSink()` - Sink selection based on configuration:
+  1. Reads SinkConfig to determine which sink to use
+  2. Creates appropriate sink instance (Console or JsonLines)
+  3. Returns configured sink wrapped in ZIO
+
 - `run()` - Application entry point:
-  1. Prints "Reading StdIn"
-  2. Creates forwarder with console source and sink
-  3. Handles graceful shutdown on stream completion
-  4. Logs all parse errors
+  1. Loads configuration from application.conf with ENV overrides
+  2. Initializes SLF4J logging backend
+  3. Creates forwarder with console source and configured sink
+  4. Handles graceful shutdown on stream completion
 
 **dto/RuuviTelemetry.scala:22** - Data model
 - Case class representing Ruuvi sensor telemetry
@@ -85,6 +105,17 @@ ruuvi-data-forwarder/
 **sinks/** - Output abstractions
 - `SensorValuesSink` - Trait providing `ZSink[Any, Any, RuuviTelemetry, Nothing, Unit]`
 - `ConsoleSensorValuesSink` - Writes JSON to stdout with trailing newline
+- `JsonLinesSensorValuesSink` - Writes JSON Lines to file with:
+  - Automatic parent directory creation
+  - Append mode (doesn't overwrite existing files)
+  - Optional debug logging of each telemetry record
+  - Configurable output path
+
+**config/** - Configuration management
+- `AppConfig` - Main application configuration
+- `SinkConfig` - Sink-specific configuration with type-safe enums
+- `JsonLinesConfig` - JSON Lines sink configuration (path, debug logging)
+- Configuration loaded from `application.conf` with environment variable overrides
 
 ### Design Patterns
 
@@ -183,29 +214,42 @@ sbt scalafmtAll
 ```
 
 **Build Output:**
-- Assembly JAR: `target/scala-3.3.0/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar`
+- Assembly JAR: `target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar`
 
 ### Running
 
+**Console Sink (default):**
 ```bash
-# With test data (echo single line)
-echo '{"battery_potential":2335,"humidity":653675,"measurement_ts_ms":1693460525701,"mac_address":[254,38,136,122,102,102],"measurement_sequence_number":53300,"movement_counter":2,"pressure":100755,"temperature_millicelsius":-29020,"tx_power":4}' | java -jar target/scala-3.3.0/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+# With test data
+echo '{"battery_potential":2335,"humidity":653675,"measurement_ts_ms":1693460525701,"mac_address":[254,38,136,122,102,102],"measurement_sequence_number":53300,"movement_counter":2,"pressure":100755,"temperature_millicelsius":-29020,"tx_power":4}' | java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # With ruuvi-reader-rs (live data)
-../ruuvi-reader-rs/target/release/ruuvi-reader-rs | java -jar target/scala-3.3.0/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+../ruuvi-reader-rs/target/release/ruuvi-reader-rs | java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # With file input
-cat test-data.jsonl | java -jar target/scala-3.3.0/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+cat test-data.jsonl | java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+```
 
-# Redirect output
-../ruuvi-reader-rs/target/release/ruuvi-reader-rs | java -jar target/scala-3.3.0/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar > processed-data.jsonl
+**JSON Lines Sink:**
+```bash
+# Write to default path (data/telemetry.jsonl)
+RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+
+# With custom path
+RUUVI_SINK_TYPE=jsonlines RUUVI_JSONLINES_PATH=/var/log/ruuvi/data.jsonl \
+  java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+
+# Disable debug logging
+RUUVI_SINK_TYPE=jsonlines RUUVI_JSONLINES_DEBUG_LOGGING=false \
+  java -jar target/scala-3.5.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 ### Testing
 
+**Unit Tests:**
 ```bash
 # Using Make (recommended)
-make test            # Run all tests
+make test            # Run all unit tests
 make lint            # Check code formatting
 
 # Or use SBT directly
@@ -216,42 +260,70 @@ sbt scalafmtCheckAll test
 sbt ~test
 ```
 
+**Integration Tests:**
+```bash
+# Test Console sink
+make test-console-sink
+
+# Test JSON Lines sink
+make test-jsonlines-sink
+
+# Test all sinks
+make test-sinks
+```
+
 **Test Coverage:**
-- ✅ 1 integration test passing
+- ✅ 4 unit tests passing
 - `AppSpec` - Verifies stdin to stdout pipeline
-- Tests pass-through of valid JSON telemetry
-- Verifies JSON parsing and serialization
+- `JsonLinesSensorValuesSinkSpec` - Tests JSON Lines sink:
+  - Write telemetry to file
+  - Create parent directories automatically
+  - Append to existing files
+- All tests validate JSON parsing and serialization
 
 ## Configuration
 
-**Current State:** No configuration files - hardcoded to stdin/stdout
+**Implementation:** Type-safe configuration using ZIO Config with HOCON format
 
-**Future Configuration (Planned):**
+Configuration is loaded from `src/main/resources/application.conf` with environment variable overrides.
+
+**Current Configuration:**
 ```hocon
-# application.conf (Typesafe Config / HOCON)
+# application.conf
 ruuvi-data-forwarder {
-  sources = [
-    {
-      type = "console"
-      format = "json"
-    }
-  ]
+  sink {
+    # Sink type: "console" or "jsonlines"
+    sink-type = "console"
+    sink-type = ${?RUUVI_SINK_TYPE}
 
-  sinks = [
-    {
-      type = "http"
-      url = "https://api.example.com/telemetry"
-      batch-size = 100
-      timeout = "30s"
-    },
-    {
-      type = "s3"
-      bucket = "ruuvi-telemetry"
-      prefix = "raw/"
+    json-lines {
+      # Output file path
+      path = "data/telemetry.jsonl"
+      path = ${?RUUVI_JSONLINES_PATH}
+
+      # Enable debug logging (logs each telemetry to debug level)
+      debug-logging = true
+      debug-logging = ${?RUUVI_JSONLINES_DEBUG_LOGGING}
     }
-  ]
+  }
 }
 ```
+
+**Environment Variables:**
+- `RUUVI_SINK_TYPE` - Sink type: `console` or `jsonlines`
+- `RUUVI_JSONLINES_PATH` - Output file path for JSON Lines sink
+- `RUUVI_JSONLINES_DEBUG_LOGGING` - Enable/disable debug logging (`true`/`false`)
+
+**Configuration Models:**
+- `AppConfig` - Main application configuration
+- `SinkConfig` - Sink configuration with type-safe enum (`SinkType`)
+- `JsonLinesConfig` - JSON Lines sink configuration
+
+**Future Sinks (Planned):**
+- HTTP sink for posting to REST APIs
+- S3 sink for cloud storage
+- PostgreSQL/TimescaleDB sink for time-series data
+- Kafka sink for event streaming
 
 ## Integration
 

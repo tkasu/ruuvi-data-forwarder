@@ -30,3 +30,7 @@ metals.sbt
 .idea
 .idea_modules
 /.worksheet/
+
+# Data files (keep .gitkeep only)
+data/*
+!data/.gitkeep
