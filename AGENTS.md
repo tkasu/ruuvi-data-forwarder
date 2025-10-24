@@ -28,7 +28,7 @@ This utility serves as the data processing and routing layer by:
 - **JSON:** ZIO-JSON 0.7.3 (compile-time JSON codec derivation)
 - **Configuration:** ZIO Config 4.0.2 with Typesafe Config support
 - **Logging:** ZIO Logging 2.3.2 with SLF4J2 backend + Logback 1.5.6
-- **Build Tool:** SBT 1.9.4
+- **Build Tool:** SBT 1.10.6
 - **Testing:** ZIO-Test 2.1.14
 - **Plugins:** sbt-assembly 2.1.1 (fat JAR), sbt-scalafmt 2.5.0 (code formatting)
 
@@ -63,7 +63,7 @@ ruuvi-data-forwarder/
 │   └── .gitkeep                                 # Keep directory in git
 ├── build.sbt                                    # Build configuration
 ├── project/
-│   ├── build.properties                         # SBT version 1.9.4
+│   ├── build.properties                         # SBT version 1.10.6
 │   └── plugins.sbt                              # sbt-assembly, sbt-scalafmt
 ├── Makefile                                     # Build & test commands
 ├── .scalafmt.conf                               # Scala 3 formatting rules
