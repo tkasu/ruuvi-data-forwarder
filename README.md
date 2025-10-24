@@ -6,7 +6,7 @@ This program is utility with the end goal of forwarding data from Ruuvi to diffe
 
 ### Requirements
 
-* jdk (tested with 21)
+* jdk (tested with 25)
 * sbt
 
 ### Development

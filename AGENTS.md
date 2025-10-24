@@ -172,8 +172,8 @@ Same JSON format with snake_case field names (validated and re-serialized):
 ### Prerequisites
 
 1. **Java Development Kit (JDK)**
-   - Tested with JDK 21 (LTS)
-   - Any JDK 21+ should work
+   - Tested with JDK 25 (LTS)
+   - Any JDK 25+ should work
    ```bash
    java -version
    ```
