@@ -15,9 +15,11 @@ class JsonLinesSensorValuesSink(filePath: String, debugLogging: Boolean)
     ZSink.foreach { telemetry =>
       for
         json <- ZIO.succeed(telemetry.toJson)
-        _ <- ZIO.logDebug(s"Writing telemetry to $filePath: $json").when(
-          debugLogging
-        )
+        _ <- ZIO
+          .logDebug(s"Writing telemetry to $filePath: $json")
+          .when(
+            debugLogging
+          )
         _ <- writeJsonLine(filePath, json)
       yield ()
     }

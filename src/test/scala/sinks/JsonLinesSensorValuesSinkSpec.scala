@@ -38,7 +38,8 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
       )
 
       val testData = List(testTelemetry1, testTelemetry2)
-      val sink = JsonLinesSensorValuesSink(tempFile.toString, debugLogging = false)
+      val sink =
+        JsonLinesSensorValuesSink(tempFile.toString, debugLogging = false)
 
       val writeAndRead = for
         // Write test data to file
@@ -53,8 +54,11 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
 
         // Parse JSON lines
         parsedTelemetry <- ZIO.foreach(fileContent)(line =>
-          ZIO.fromEither(line.fromJson[RuuviTelemetry])
-            .mapError(err => new RuntimeException(s"Failed to parse JSON: $err"))
+          ZIO
+            .fromEither(line.fromJson[RuuviTelemetry])
+            .mapError(err =>
+              new RuntimeException(s"Failed to parse JSON: $err")
+            )
         )
 
         // Clean up temp file
@@ -65,8 +69,9 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
         Assertion.hasSameElements(testData)
       )
     },
-
-    test("JsonLinesSensorValuesSink should create parent directories if they don't exist") {
+    test(
+      "JsonLinesSensorValuesSink should create parent directories if they don't exist"
+    ) {
       val tempDir = Files.createTempDirectory("ruuvi-test-dir-")
       val nestedPath = tempDir.resolve("nested/path/telemetry.jsonl")
 
@@ -82,7 +87,8 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
         txPower = 4
       )
 
-      val sink = JsonLinesSensorValuesSink(nestedPath.toString, debugLogging = false)
+      val sink =
+        JsonLinesSensorValuesSink(nestedPath.toString, debugLogging = false)
 
       val writeAndVerify = for
         _ <- ZStream.fromIterable(List(testTelemetry)).run(sink.make)
@@ -95,9 +101,11 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
           finally source.close()
         }
 
-        parsedTelemetry <- ZIO.fromEither(
-          fileContent.head.fromJson[RuuviTelemetry]
-        ).mapError(err => new RuntimeException(s"Failed to parse JSON: $err"))
+        parsedTelemetry <- ZIO
+          .fromEither(
+            fileContent.head.fromJson[RuuviTelemetry]
+          )
+          .mapError(err => new RuntimeException(s"Failed to parse JSON: $err"))
 
         // Clean up (delete in correct order: file, then directories from innermost to outermost)
         _ <- ZIO.attempt {
@@ -112,7 +120,6 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
         Assertion.equalTo((true, testTelemetry))
       }
     },
-
     test("JsonLinesSensorValuesSink should append to existing file") {
       val tempFile = Files.createTempFile("ruuvi-test-append-", ".jsonl")
 
@@ -144,7 +151,8 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
         )
       )
 
-      val sink = JsonLinesSensorValuesSink(tempFile.toString, debugLogging = false)
+      val sink =
+        JsonLinesSensorValuesSink(tempFile.toString, debugLogging = false)
 
       val writeAndRead = for
         // Write first batch
@@ -162,8 +170,11 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
 
         // Parse all lines
         parsedTelemetry <- ZIO.foreach(fileContent)(line =>
-          ZIO.fromEither(line.fromJson[RuuviTelemetry])
-            .mapError(err => new RuntimeException(s"Failed to parse JSON: $err"))
+          ZIO
+            .fromEither(line.fromJson[RuuviTelemetry])
+            .mapError(err =>
+              new RuntimeException(s"Failed to parse JSON: $err")
+            )
         )
 
         // Clean up

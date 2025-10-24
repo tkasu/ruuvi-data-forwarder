@@ -10,9 +10,14 @@ enum SinkType:
 object SinkType:
   given Config[SinkType] =
     Config.string.mapOrFail {
-      case "console"    => Right(SinkType.Console)
-      case "jsonlines"  => Right(SinkType.JsonLines)
-      case other        => Left(Config.Error.InvalidData(message = s"Invalid sink type: $other. Must be 'console' or 'jsonlines'"))
+      case "console"   => Right(SinkType.Console)
+      case "jsonlines" => Right(SinkType.JsonLines)
+      case other =>
+        Left(
+          Config.Error.InvalidData(message =
+            s"Invalid sink type: $other. Must be 'console' or 'jsonlines'"
+          )
+        )
     }
 
 case class JsonLinesConfig(
@@ -21,7 +26,8 @@ case class JsonLinesConfig(
 )
 
 object JsonLinesConfig:
-  implicit lazy val configDescriptor: Config[JsonLinesConfig] = deriveConfig[JsonLinesConfig]
+  implicit lazy val configDescriptor: Config[JsonLinesConfig] =
+    deriveConfig[JsonLinesConfig]
 
 case class SinkConfig(
     sinkType: SinkType,
@@ -29,4 +35,5 @@ case class SinkConfig(
 )
 
 object SinkConfig:
-  implicit lazy val configDescriptor: Config[SinkConfig] = deriveConfig[SinkConfig]
+  implicit lazy val configDescriptor: Config[SinkConfig] =
+    deriveConfig[SinkConfig]

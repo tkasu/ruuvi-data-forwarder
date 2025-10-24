@@ -18,7 +18,9 @@ object App extends ZIOAppDefault:
       ZIO.logError(s"Error parsing telemetry: ${e.getMessage}")
     }.forever
 
-  def selectSink(sinkConfig: SinkConfig): ZIO[Any, Throwable, SensorValuesSink] =
+  def selectSink(
+      sinkConfig: SinkConfig
+  ): ZIO[Any, Throwable, SensorValuesSink] =
     sinkConfig.sinkType match
       case SinkType.Console =>
         ZIO.logInfo("Using Console sink (stdout)") *>
@@ -28,7 +30,9 @@ object App extends ZIOAppDefault:
         sinkConfig.jsonLines match
           case Some(jsonLinesConfig) =>
             ZIO.logInfo(s"Using JSON Lines sink: ${jsonLinesConfig.path}") *>
-              ZIO.logInfo(s"Debug logging enabled: ${jsonLinesConfig.debugLogging}") *>
+              ZIO.logInfo(
+                s"Debug logging enabled: ${jsonLinesConfig.debugLogging}"
+              ) *>
               ZIO.succeed(
                 JsonLinesSensorValuesSink(
                   jsonLinesConfig.path,
