@@ -161,20 +161,29 @@ Same JSON format with snake_case field names (validated and re-serialized):
 
 ### Build Commands
 
+This project includes a Makefile with standard targets. Run `make help` to see all available commands.
+
 ```bash
-# Code formatting check
-sbt scalafmtCheckAll
+# Using Make (recommended)
+make build           # Compile project
+make build-assembly  # Build fat JAR with all dependencies
+make test            # Run all tests
+make lint            # Check code formatting
+make format          # Format code with scalafmt
+make clean           # Remove build artifacts
+make run             # Run application (reads from stdin)
+make console         # Start SBT console
 
-# Compile
+# Or use SBT directly
 sbt compile
-
-# Run tests
-sbt test
-
-# Build fat JAR (includes all dependencies)
 sbt assembly
-# Output: target/scala-3.3.0/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+sbt test
+sbt scalafmtCheckAll
+sbt scalafmtAll
 ```
+
+**Build Output:**
+- Assembly JAR: `target/scala-3.3.0/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar`
 
 ### Running
 
@@ -195,18 +204,21 @@ cat test-data.jsonl | java -jar target/scala-3.3.0/ruuvi-data-forwarder-assembly
 ### Testing
 
 ```bash
-# Run all tests with formatting check
-sbt scalafmtCheckAll test
+# Using Make (recommended)
+make test            # Run all tests
+make lint            # Check code formatting
 
-# Run tests only
+# Or use SBT directly
 sbt test
+sbt scalafmtCheckAll test
 
 # Continuous testing (re-run on file changes)
 sbt ~test
 ```
 
 **Test Coverage:**
-- `AppSpec` - Integration test verifying stdin to stdout pipeline
+- ✅ 1 integration test passing
+- `AppSpec` - Verifies stdin to stdout pipeline
 - Tests pass-through of valid JSON telemetry
 - Verifies JSON parsing and serialization
 
