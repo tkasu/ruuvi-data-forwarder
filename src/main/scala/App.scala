@@ -8,6 +8,18 @@ import _root_.config.{AppConfig, SinkConfig, SinkType, JsonLinesConfig}
 
 object App extends ZIOAppDefault:
 
+  /** Creates a forwarder pipeline that reads from source and writes to sink.
+    *
+    * Note: Uses ZIO logging - ensure logging backend is configured in the
+    * Runtime (see `run` method for SLF4J backend configuration).
+    *
+    * @param sourceCreator
+    *   Source that provides sensor telemetry stream
+    * @param sinkCreator
+    *   Sink that consumes sensor telemetry
+    * @return
+    *   ZIO effect that runs forever, catching and logging parse errors
+    */
   def forwarder(
       sourceCreator: SensorValuesSource,
       sinkCreator: SensorValuesSink
@@ -18,6 +30,16 @@ object App extends ZIOAppDefault:
       ZIO.logError(s"Error parsing telemetry: ${e.getMessage}")
     }.forever
 
+  /** Selects and initializes the appropriate sink based on configuration.
+    *
+    * Note: Uses ZIO logging - ensure logging backend is configured in the
+    * Runtime (see `run` method for SLF4J backend configuration).
+    *
+    * @param sinkConfig
+    *   Configuration specifying which sink to use
+    * @return
+    *   ZIO effect that produces the configured sink instance
+    */
   def selectSink(
       sinkConfig: SinkConfig
   ): ZIO[Any, Throwable, SensorValuesSink] =

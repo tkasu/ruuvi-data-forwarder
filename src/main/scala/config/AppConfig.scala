@@ -12,6 +12,3 @@ case class AppConfig(
 object AppConfig:
   implicit lazy val configDescriptor: Config[AppConfig] =
     deriveConfig[AppConfig]
-
-  val layer =
-    TypesafeConfigProvider.fromResourcePath().nested("ruuvi-data-forwarder")
