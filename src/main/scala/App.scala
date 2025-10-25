@@ -5,7 +5,13 @@ import zio.config.typesafe.TypesafeConfigProvider
 
 import sinks.*
 import sources.*
-import _root_.config.{AppConfig, SinkConfig, SinkType, JsonLinesConfig, HttpConfig}
+import _root_.config.{
+  AppConfig,
+  SinkConfig,
+  SinkType,
+  JsonLinesConfig,
+  HttpConfig
+}
 
 object App extends ZIOAppDefault:
 

@@ -77,7 +77,8 @@ class HttpSensorValuesSink(
       telemetry: RuuviTelemetry
   ): List[TelemetryData] =
     val timestamp = telemetry.measurementTsMs
-    val macAddress = telemetry.macAddress.map(b => f"${b & 0xff}%02X").mkString(":")
+    val macAddress =
+      telemetry.macAddress.map(b => f"${b & 0xff}%02X").mkString(":")
 
     List(
       TelemetryData(
