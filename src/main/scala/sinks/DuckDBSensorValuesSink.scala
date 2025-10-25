@@ -13,16 +13,31 @@ class DuckDBSensorValuesSink(
     debugLogging: Boolean
 ) extends SensorValuesSink:
 
-  def make: ZSink[Any, Throwable, RuuviTelemetry, Nothing, Unit] =
-    ZSink.foreach { telemetry =>
+  // Initialize database and table once when sink is created
+  private val initializeDatabase: ZIO[Any, Throwable, Unit] =
+    ZIO.scoped {
       for
-        _ <- ZIO
-          .logDebug(
-            s"Writing telemetry to DuckDB (table: $tableName): ${telemetry.macAddress.mkString(",")}"
-          )
-          .when(debugLogging)
-        _ <- insertTelemetry(dbPath, tableName, telemetry)
+        _ <- validateTableName(tableName)
+        conn <- acquireConnection(dbPath)
+        _ <- ensureTableExists(conn, tableName)
       yield ()
+    }
+
+  def make: ZSink[Any, Throwable, RuuviTelemetry, Nothing, Unit] =
+    ZSink.unwrap {
+      // Initialize database and table once before processing any telemetry
+      initializeDatabase.as {
+        ZSink.foreach { telemetry =>
+          for
+            _ <- ZIO
+              .logDebug(
+                s"Writing telemetry to DuckDB (table: $tableName): ${telemetry.macAddress.mkString(",")}"
+              )
+              .when(debugLogging)
+            _ <- insertTelemetry(dbPath, tableName, telemetry)
+          yield ()
+        }
+      }
     }
 
   private def insertTelemetry(
@@ -33,7 +48,6 @@ class DuckDBSensorValuesSink(
     ZIO.scoped {
       for
         conn <- acquireConnection(path)
-        _ <- ensureTableExists(conn, table)
         _ <- insertRecord(conn, table, telemetry)
       yield ()
     }
@@ -98,10 +112,8 @@ class DuckDBSensorValuesSink(
       table: String,
       telemetry: RuuviTelemetry
   ): ZIO[Any, Throwable, Unit] =
-    for
-      _ <- validateTableName(table)
-      _ <- ZIO.attemptBlocking {
-        val insertSQL = s"""
+    ZIO.attemptBlocking {
+      val insertSQL = s"""
         INSERT INTO $table (
           temperature_millicelsius,
           humidity,
@@ -114,18 +126,17 @@ class DuckDBSensorValuesSink(
           mac_address
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       """
-        val pstmt = conn.prepareStatement(insertSQL)
-        try
-          pstmt.setInt(1, telemetry.temperatureMillicelsius)
-          pstmt.setInt(2, telemetry.humidity)
-          pstmt.setInt(3, telemetry.pressure)
-          pstmt.setInt(4, telemetry.batteryPotential)
-          pstmt.setInt(5, telemetry.txPower)
-          pstmt.setInt(6, telemetry.movementCounter)
-          pstmt.setInt(7, telemetry.measurementSequenceNumber)
-          pstmt.setLong(8, telemetry.measurementTsMs)
-          pstmt.setString(9, telemetry.macAddress.mkString(","))
-          pstmt.executeUpdate()
-        finally pstmt.close()
-      }
-    yield ()
+      val pstmt = conn.prepareStatement(insertSQL)
+      try
+        pstmt.setInt(1, telemetry.temperatureMillicelsius)
+        pstmt.setInt(2, telemetry.humidity)
+        pstmt.setInt(3, telemetry.pressure)
+        pstmt.setInt(4, telemetry.batteryPotential)
+        pstmt.setInt(5, telemetry.txPower)
+        pstmt.setInt(6, telemetry.movementCounter)
+        pstmt.setInt(7, telemetry.measurementSequenceNumber)
+        pstmt.setLong(8, telemetry.measurementTsMs)
+        pstmt.setString(9, telemetry.macAddress.mkString(","))
+        pstmt.executeUpdate()
+      finally pstmt.close()
+    }
