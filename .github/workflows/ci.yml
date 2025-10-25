@@ -70,6 +70,8 @@ jobs:
 
       - name: Build assembly JAR
         run: make build-assembly
+        env:
+          SBT_OPTS: "-Xmx2G"
 
       - name: Upload assembly artifact
         uses: actions/upload-artifact@v4
@@ -99,6 +101,8 @@ jobs:
 
       - name: Build assembly JAR
         run: make build-assembly
+        env:
+          SBT_OPTS: "-Xmx2G"
 
       - name: Run integration tests
         run: make test-sinks
