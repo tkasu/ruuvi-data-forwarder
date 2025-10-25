@@ -6,12 +6,12 @@ A Scala 3 + ZIO-based middleware for processing and forwarding Ruuvi Tag sensor 
 
 ### Features
 
-- ✅ **Multiple Sinks**: Console (stdout) and JSON Lines (file) sinks
+- ✅ **Multiple Sinks**: Console (stdout), JSON Lines (file), and HTTP (ruuvitag-api) sinks
 - ✅ **Configuration**: Type-safe config with HOCON + environment variable overrides
 - ✅ **Structured Logging**: ZIO logging with SLF4J/Logback backend
 - ✅ **Stream Processing**: ZIO Streams with backpressure support
 - ✅ **Type Safety**: Compile-time JSON validation and derivation
-- 🚧 **Future**: HTTP, S3, PostgreSQL, Kafka sinks (planned)
+- 🚧 **Future**: S3, PostgreSQL, Kafka sinks (planned)
 
 ### Requirements
 
@@ -70,6 +70,62 @@ Or inline:
 RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
+#### 3. HTTP Sink
+
+Sends telemetry data to a ruuvitag-api compatible HTTP endpoint. Each RuuviTelemetry record is transformed into multiple measurements (temperature, humidity, pressure, battery, etc.) and posted to the API.
+
+**Features:**
+- Transforms Ruuvi telemetry to ruuvitag-api format
+- Posts each measurement type separately
+- Automatic retry on failure (via ZIO HTTP)
+- Debug logging of each HTTP request (configurable)
+
+**Configuration:**
+```shell
+# Set via environment variables
+export RUUVI_SINK_TYPE=http
+export RUUVI_HTTP_API_URL=http://localhost:8080/v1  # Optional, default shown
+export RUUVI_HTTP_SENSOR_NAME=default-sensor        # Optional, default shown
+export RUUVI_HTTP_DEBUG_LOGGING=true                # Optional, default shown
+
+# Run
+java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+```
+
+Or inline:
+```shell
+RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://localhost:8080/v1 RUUVI_HTTP_SENSOR_NAME=my-sensor java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+```
+
+**API Format:**
+
+The sink posts to `/telemetry/{sensorName}` with payload:
+```json
+[
+  {
+    "telemetry_type": "temperature",
+    "data": [
+      {
+        "sensor_name": "FE:26:88:7A:66:66",
+        "timestamp": 1693460525699,
+        "value": -29.02
+      }
+    ]
+  },
+  {
+    "telemetry_type": "humidity",
+    "data": [
+      {
+        "sensor_name": "FE:26:88:7A:66:66",
+        "timestamp": 1693460525699,
+        "value": 65.3675
+      }
+    ]
+  }
+  // ... (pressure, battery, tx_power, movement_counter, measurement_sequence_number)
+]
+```
+
 ### Configuration
 
 Configuration is loaded from `src/main/resources/application.conf` with environment variable overrides.
@@ -77,19 +133,28 @@ Configuration is loaded from `src/main/resources/application.conf` with environm
 **Default Configuration:**
 ```hocon
 sink {
-    sink-type = "console"              # "console" or "jsonlines"
+    sink-type = "console"              # "console", "jsonlines", or "http"
 
     json-lines {
       path = "data/telemetry.jsonl"    # Output file path
       debug-logging = true              # Log each telemetry to debug level
     }
+
+    http {
+      api-url = "http://localhost:8080/v1"  # ruuvitag-api base URL
+      sensor-name = "default-sensor"        # Sensor name for API requests
+      debug-logging = true                  # Log each HTTP request to debug level
+    }
   }
 ```
 
 **Environment Variables:**
-- `RUUVI_SINK_TYPE` - Sink type: `console` or `jsonlines`
+- `RUUVI_SINK_TYPE` - Sink type: `console`, `jsonlines`, or `http`
 - `RUUVI_JSONLINES_PATH` - Output file path for JSON Lines sink
 - `RUUVI_JSONLINES_DEBUG_LOGGING` - Enable/disable debug logging (`true`/`false`)
+- `RUUVI_HTTP_API_URL` - Base URL for ruuvitag-api HTTP sink
+- `RUUVI_HTTP_SENSOR_NAME` - Sensor name for HTTP sink API requests
+- `RUUVI_HTTP_DEBUG_LOGGING` - Enable/disable debug logging for HTTP sink (`true`/`false`)
 
 ### Development
 
@@ -156,6 +221,9 @@ ruuvi-reader-rs | java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1
 # Save to file
 ruuvi-reader-rs | RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 # Data saved to: data/telemetry.jsonl
+
+# Send to HTTP API
+ruuvi-reader-rs | RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com/v1 RUUVI_HTTP_SENSOR_NAME=outdoor-sensor java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 #### From File
@@ -169,14 +237,22 @@ cat telemetry.jsonl | \
   RUUVI_SINK_TYPE=jsonlines \
   RUUVI_JSONLINES_PATH=/var/log/ruuvi/output.jsonl \
   java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+
+# HTTP sink with custom API
+cat telemetry.jsonl | \
+  RUUVI_SINK_TYPE=http \
+  RUUVI_HTTP_API_URL=http://api.example.com/v1 \
+  RUUVI_HTTP_SENSOR_NAME=my-sensor \
+  java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 #### Fan-out to Multiple Sinks
 
 ```shell
-# Using tee to write to both console and file
+# Using tee to write to multiple sinks simultaneously
 ruuvi-reader-rs | tee \
   >(RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
+  >(RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com/v1 java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
   >(java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar)
 ```
 
