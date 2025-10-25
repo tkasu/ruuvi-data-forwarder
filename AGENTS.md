@@ -479,6 +479,22 @@ ls -lh target/scala-3.3.0/*assembly*.jar
 - **ruuvi-reader-rs** - Upstream BLE scanner that feeds this forwarder
 - **ruuvi-api** - Downstream REST API for serving telemetry
 
+## Contributing
+
+### Working with AI Assistants
+
+When committing changes that were created with the help of an AI assistant (e.g., GitHub Copilot, Gemini, Claude), please use the `Co-authored-by:` trailer in your commit message to give proper credit. This helps track the origin of the code and acknowledges the role of the AI in the development process.
+
+**Example:**
+
+```
+feat: Add user authentication
+
+Implement the user login and registration endpoints.
+
+Co-authored-by: Name of the AI <ai-assistant@example.com>
+```
+
 ## Resources
 
 - [ZIO Documentation](https://zio.dev/)
