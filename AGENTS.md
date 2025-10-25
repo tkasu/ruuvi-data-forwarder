@@ -290,8 +290,7 @@ Configuration is loaded from `src/main/resources/application.conf` with environm
 **Current Configuration:**
 ```hocon
 # application.conf
-ruuvi-data-forwarder {
-  sink {
+sink {
     # Sink type: "console" or "jsonlines"
     sink-type = "console"
     sink-type = ${?RUUVI_SINK_TYPE}
@@ -305,7 +304,6 @@ ruuvi-data-forwarder {
       debug-logging = true
       debug-logging = ${?RUUVI_JSONLINES_DEBUG_LOGGING}
     }
-  }
 }
 ```
 
