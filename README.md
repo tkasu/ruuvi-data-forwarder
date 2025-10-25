@@ -15,7 +15,7 @@ A Scala 3 + ZIO-based middleware for processing and forwarding Ruuvi Tag sensor 
 
 ### Requirements
 
-- JDK 11+ (tested with JDK 20)
+- JDK 11+ (tested with JDK 25)
 - SBT (Scala Build Tool)
 
 ### Quick Start
