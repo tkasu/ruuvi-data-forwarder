@@ -76,8 +76,7 @@ Configuration is loaded from `src/main/resources/application.conf` with environm
 
 **Default Configuration:**
 ```hocon
-ruuvi-data-forwarder {
-  sink {
+sink {
     sink-type = "console"              # "console" or "jsonlines"
 
     json-lines {
@@ -85,7 +84,6 @@ ruuvi-data-forwarder {
       debug-logging = true              # Log each telemetry to debug level
     }
   }
-}
 ```
 
 **Environment Variables:**
