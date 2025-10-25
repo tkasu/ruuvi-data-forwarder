@@ -143,7 +143,7 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
               rs.getInt("measurement_sequence_number"),
             measurementTsMs = rs.getLong("measurement_ts_ms"),
             macAddress =
-              rs.getString("mac_address").split(",").map(_.toShort).toSeq
+              rs.getString("mac_address").split(",").map(_.toInt.toShort).toSeq
           )
 
           rs.close()
