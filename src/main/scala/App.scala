@@ -5,7 +5,7 @@ import zio.config.typesafe.TypesafeConfigProvider
 
 import sinks.*
 import sources.*
-import _root_.config.{AppConfig, SinkConfig, SinkType, JsonLinesConfig}
+import _root_.config.{AppConfig, SinkConfig, SinkType, JsonLinesConfig, HttpConfig}
 
 object App extends ZIOAppDefault:
 
@@ -70,6 +70,28 @@ object App extends ZIOAppDefault:
             ZIO.fail(
               RuntimeException(
                 "JSON Lines sink selected but configuration is missing"
+              )
+            )
+
+      case SinkType.Http =>
+        sinkConfig.http match
+          case Some(httpConfig) =>
+            ZIO.logInfo(s"Using HTTP sink: ${httpConfig.apiUrl}") *>
+              ZIO.logInfo(s"Sensor name: ${httpConfig.sensorName}") *>
+              ZIO.logInfo(
+                s"Debug logging enabled: ${httpConfig.debugLogging}"
+              ) *>
+              ZIO.succeed(
+                HttpSensorValuesSink(
+                  httpConfig.apiUrl,
+                  httpConfig.sensorName,
+                  httpConfig.debugLogging
+                )
+              )
+          case None =>
+            ZIO.fail(
+              RuntimeException(
+                "HTTP sink selected but configuration is missing"
               )
             )
 
