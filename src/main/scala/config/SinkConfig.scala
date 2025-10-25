@@ -3,7 +3,6 @@ package config
 import zio.Config
 import zio.config.*
 import zio.config.magnolia.*
-import zio.config.magnolia.name
 
 enum SinkType:
   case Console, JsonLines

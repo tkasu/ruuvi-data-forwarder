@@ -30,10 +30,8 @@ class JsonLinesSensorValuesSink(filePath: String, debugLogging: Boolean)
   ): ZIO[Any, java.io.IOException, Unit] =
     ZIO.attemptBlockingIO {
       val filePath = Paths.get(path)
-      // Create parent directories if they don't exist
-      Option(filePath.getParent).foreach(p =>
-        if !Files.exists(p) then Files.createDirectories(p)
-      )
+      // Create parent directories if they don't exist (idempotent operation)
+      Option(filePath.getParent).foreach(Files.createDirectories(_))
       // Append the JSON line with newline
       val content = s"$json\n"
       Files.write(

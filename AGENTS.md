@@ -304,7 +304,6 @@ sink {
       debug-logging = true
       debug-logging = ${?RUUVI_JSONLINES_DEBUG_LOGGING}
     }
-    }
 }
 ```
 

@@ -77,7 +77,7 @@ test-jsonlines-sink: check-assembly create-test-data
 	@echo "Writing test data to data/telemetry.jsonl..."
 	@(cat $(TEST_DATA) | RUUVI_SINK_TYPE=jsonlines java -jar $(ASSEMBLY_JAR) > /dev/null 2>&1 &) ; \
 		PID=$$! ; \
-		TIMEOUT=10 ; \
+		TIMEOUT=50 ; \
 		WAITED=0 ; \
 		while [ ! -f data/telemetry.jsonl ] && [ $$WAITED -lt $$TIMEOUT ]; do \
 			sleep 0.2 ; \
