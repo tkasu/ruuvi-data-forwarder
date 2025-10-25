@@ -116,7 +116,15 @@ duckdb data/telemetry.db
 SELECT COUNT(*) FROM telemetry;
 SELECT * FROM telemetry ORDER BY measurement_ts_ms DESC LIMIT 10;
 SELECT AVG(temperature_millicelsius / 1000.0) as avg_temp_celsius FROM telemetry;
+
+# Query by MAC address (stored in standard format: FE:26:88:7A:66:66)
+SELECT * FROM telemetry WHERE mac_address = 'D5:12:34:66:14:14';
 ```
+
+**Database Schema:**
+- MAC addresses are stored in standard hex format (e.g., `FE:26:88:7A:66:66`)
+- Timestamps are stored as milliseconds since epoch
+- All sensor values stored as integers for precision
 
 ### Configuration
 

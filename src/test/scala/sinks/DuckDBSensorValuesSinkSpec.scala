@@ -76,8 +76,11 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
               measurementSequenceNumber =
                 rs.getInt("measurement_sequence_number"),
               measurementTsMs = rs.getLong("measurement_ts_ms"),
-              macAddress =
-                rs.getString("mac_address").split(",").map(_.toInt.toShort).toSeq
+              macAddress = rs
+                .getString("mac_address")
+                .split(":")
+                .map(Integer.parseInt(_, 16).toShort)
+                .toSeq
             )
 
           rs.close()
@@ -142,8 +145,11 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
             measurementSequenceNumber =
               rs.getInt("measurement_sequence_number"),
             measurementTsMs = rs.getLong("measurement_ts_ms"),
-            macAddress =
-              rs.getString("mac_address").split(",").map(_.toInt.toShort).toSeq
+            macAddress = rs
+              .getString("mac_address")
+              .split(":")
+              .map(Integer.parseInt(_, 16).toShort)
+              .toSeq
           )
 
           rs.close()
@@ -208,8 +214,11 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
             measurementSequenceNumber =
               rs.getInt("measurement_sequence_number"),
             measurementTsMs = rs.getLong("measurement_ts_ms"),
-            macAddress =
-              rs.getString("mac_address").split(",").map(_.toInt.toShort).toSeq
+            macAddress = rs
+              .getString("mac_address")
+              .split(":")
+              .map(Integer.parseInt(_, 16).toShort)
+              .toSeq
           )
 
           rs.close()
@@ -299,8 +308,11 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
               measurementSequenceNumber =
                 rs.getInt("measurement_sequence_number"),
               measurementTsMs = rs.getLong("measurement_ts_ms"),
-              macAddress =
-                rs.getString("mac_address").split(",").map(_.toInt.toShort).toSeq
+              macAddress = rs
+                .getString("mac_address")
+                .split(":")
+                .map(Integer.parseInt(_, 16).toShort)
+                .toSeq
             )
 
           rs.close()

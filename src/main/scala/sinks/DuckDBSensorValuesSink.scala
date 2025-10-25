@@ -136,7 +136,11 @@ class DuckDBSensorValuesSink(
         pstmt.setInt(6, telemetry.movementCounter)
         pstmt.setInt(7, telemetry.measurementSequenceNumber)
         pstmt.setLong(8, telemetry.measurementTsMs)
-        pstmt.setString(9, telemetry.macAddress.mkString(","))
+        // Store MAC address in standard format (e.g., "FE:26:88:7A:66:66")
+        val macAddress = telemetry.macAddress
+          .map(b => f"${b & 0xff}%02X")
+          .mkString(":")
+        pstmt.setString(9, macAddress)
         pstmt.executeUpdate()
       finally pstmt.close()
     }
