@@ -99,7 +99,7 @@ RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://localhost:8080/v1 RUUVI_HTTP_SENS
 
 **API Format:**
 
-The sink posts to `/telemetry/{sensorName}` with payload:
+The sink posts to `/telemetry/{sensorName}` with payload (truncated example showing 2 of 7 measurement types):
 ```json
 [
   {
@@ -122,9 +122,10 @@ The sink posts to `/telemetry/{sensorName}` with payload:
       }
     ]
   }
-  // ... (pressure, battery, tx_power, movement_counter, measurement_sequence_number)
 ]
 ```
+
+Each telemetry record generates 7 separate measurement types: `temperature`, `humidity`, `pressure`, `battery`, `tx_power`, `movement_counter`, and `measurement_sequence_number`.
 
 ### Configuration
 
