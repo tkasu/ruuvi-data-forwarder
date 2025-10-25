@@ -12,6 +12,9 @@ class JsonLinesSensorValuesSink(filePath: String, debugLogging: Boolean)
     extends SensorValuesSink:
 
   def make: ZSink[Any, java.io.IOException, RuuviTelemetry, Nothing, Unit] =
+    // Note: Sequential processing is suitable for typical sensor telemetry rates.
+    // For high-throughput scenarios, consider ZSink.foreachChunk (batched writes)
+    // or ZSink.foreachParN (parallel writes) to improve performance.
     ZSink.foreach { telemetry =>
       for
         json <- ZIO.succeed(telemetry.toJson)
