@@ -8,10 +8,8 @@
     </appender>
 
     <!-- Root logger configuration -->
-    <root level="INFO">
+    <root level="DEBUG">
         <appender-ref ref="CONSOLE" />
     </root>
 
-    <!-- Application-specific logger (can be set to DEBUG for development) -->
-    <logger name="ruuvi-data-forwarder" level="DEBUG" />
 </configuration>

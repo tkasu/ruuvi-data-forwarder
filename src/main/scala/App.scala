@@ -1,12 +1,17 @@
 import zio.*
 import zio.logging.*
 import zio.logging.backend.SLF4J
+import zio.config.typesafe.TypesafeConfigProvider
 
 import sinks.*
 import sources.*
 import _root_.config.{AppConfig, SinkConfig, SinkType, JsonLinesConfig}
 
 object App extends ZIOAppDefault:
+
+  // Configure TypesafeConfig provider to load from application.conf
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
+    Runtime.setConfigProvider(TypesafeConfigProvider.fromResourcePath())
 
   /** Creates a forwarder pipeline that reads from source and writes to sink.
     *
@@ -69,7 +74,7 @@ object App extends ZIOAppDefault:
             )
 
   def run = (for
-    appConfig <- ZIO.config[AppConfig]
+    appConfig <- ZIO.config(AppConfig.descriptor)
     _ <- ZIO.logInfo("Starting Ruuvi Data Forwarder")
     _ <- ZIO.logInfo("Reading from StdIn")
     sink <- selectSink(appConfig.sink)

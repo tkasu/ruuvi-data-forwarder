@@ -3,6 +3,7 @@ package config
 import zio.Config
 import zio.config.*
 import zio.config.magnolia.*
+import zio.config.magnolia.name
 
 enum SinkType:
   case Console, JsonLines
@@ -20,20 +21,23 @@ object SinkType:
         )
     }
 
+import zio.config.magnolia.name
+
 case class JsonLinesConfig(
     path: String,
+    @name("debug-logging")
     debugLogging: Boolean
 )
 
 object JsonLinesConfig:
-  implicit lazy val configDescriptor: Config[JsonLinesConfig] =
-    deriveConfig[JsonLinesConfig]
+  val descriptor: Config[JsonLinesConfig] = deriveConfig[JsonLinesConfig]
 
 case class SinkConfig(
+    @name("sink-type")
     sinkType: SinkType,
+    @name("json-lines")
     jsonLines: Option[JsonLinesConfig]
 )
 
 object SinkConfig:
-  implicit lazy val configDescriptor: Config[SinkConfig] =
-    deriveConfig[SinkConfig]
+  val descriptor: Config[SinkConfig] = deriveConfig[SinkConfig]
