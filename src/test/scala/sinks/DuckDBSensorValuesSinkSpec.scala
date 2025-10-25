@@ -316,5 +316,47 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
       assertZIO(writeAndRead)(
         Assertion.hasSameElements(firstBatch ++ secondBatch)
       )
+    },
+    test("DuckDBSensorValuesSink should reject invalid table names") {
+      val invalidTableNames = List(
+        "telemetry; DROP TABLE users--",
+        "telemetry'--",
+        "telemetry OR 1=1",
+        "123invalid",
+        "table-name",
+        "table.name"
+      )
+
+      val testTelemetry = RuuviTelemetry(
+        batteryPotential = 2335,
+        humidity = 653675,
+        macAddress = Seq(254, 38, 136, 122, 102, 102),
+        measurementTsMs = 1693460525699L,
+        measurementSequenceNumber = 53300,
+        movementCounter = 2,
+        pressure = 100755,
+        temperatureMillicelsius = -29020,
+        txPower = 4
+      )
+
+      val tests = ZIO.foreach(invalidTableNames) { invalidName =>
+        val sink = DuckDBSensorValuesSink(
+          ":memory:",
+          invalidName,
+          debugLogging = false
+        )
+
+        ZStream
+          .fromIterable(List(testTelemetry))
+          .run(sink.make)
+          .flip
+          .map(_.getMessage)
+      }
+
+      assertZIO(tests)(
+        Assertion.forall(
+          Assertion.containsString("Invalid table name")
+        )
+      )
     }
   )

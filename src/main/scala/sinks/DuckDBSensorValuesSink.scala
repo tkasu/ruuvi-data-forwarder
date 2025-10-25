@@ -61,8 +61,10 @@ class DuckDBSensorValuesSink(
       conn: Connection,
       table: String
   ): ZIO[Any, Throwable, Unit] =
-    ZIO.attemptBlocking {
-      val createTableSQL = s"""
+    for
+      _ <- validateTableName(table)
+      _ <- ZIO.attemptBlocking {
+        val createTableSQL = s"""
         CREATE TABLE IF NOT EXISTS $table (
           temperature_millicelsius INTEGER NOT NULL,
           humidity INTEGER NOT NULL,
@@ -75,9 +77,20 @@ class DuckDBSensorValuesSink(
           mac_address VARCHAR NOT NULL
         )
       """
-      val stmt = conn.createStatement()
-      try stmt.execute(createTableSQL)
-      finally stmt.close()
+        val stmt = conn.createStatement()
+        try stmt.execute(createTableSQL)
+        finally stmt.close()
+      }
+    yield ()
+
+  private def validateTableName(name: String): ZIO[Any, Throwable, Unit] =
+    ZIO.attempt {
+      // Validate table name to prevent SQL injection
+      // Allow only alphanumeric characters and underscores
+      if !name.matches("^[a-zA-Z_][a-zA-Z0-9_]*$") then
+        throw new IllegalArgumentException(
+          s"Invalid table name: '$name'. Table name must start with a letter or underscore and contain only alphanumeric characters and underscores."
+        )
     }
 
   private def insertRecord(
@@ -85,8 +98,10 @@ class DuckDBSensorValuesSink(
       table: String,
       telemetry: RuuviTelemetry
   ): ZIO[Any, Throwable, Unit] =
-    ZIO.attemptBlocking {
-      val insertSQL = s"""
+    for
+      _ <- validateTableName(table)
+      _ <- ZIO.attemptBlocking {
+        val insertSQL = s"""
         INSERT INTO $table (
           temperature_millicelsius,
           humidity,
@@ -99,17 +114,18 @@ class DuckDBSensorValuesSink(
           mac_address
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       """
-      val pstmt = conn.prepareStatement(insertSQL)
-      try
-        pstmt.setInt(1, telemetry.temperatureMillicelsius)
-        pstmt.setInt(2, telemetry.humidity)
-        pstmt.setInt(3, telemetry.pressure)
-        pstmt.setInt(4, telemetry.batteryPotential)
-        pstmt.setInt(5, telemetry.txPower)
-        pstmt.setInt(6, telemetry.movementCounter)
-        pstmt.setInt(7, telemetry.measurementSequenceNumber)
-        pstmt.setLong(8, telemetry.measurementTsMs)
-        pstmt.setString(9, telemetry.macAddress.mkString(","))
-        pstmt.executeUpdate()
-      finally pstmt.close()
-    }
+        val pstmt = conn.prepareStatement(insertSQL)
+        try
+          pstmt.setInt(1, telemetry.temperatureMillicelsius)
+          pstmt.setInt(2, telemetry.humidity)
+          pstmt.setInt(3, telemetry.pressure)
+          pstmt.setInt(4, telemetry.batteryPotential)
+          pstmt.setInt(5, telemetry.txPower)
+          pstmt.setInt(6, telemetry.movementCounter)
+          pstmt.setInt(7, telemetry.measurementSequenceNumber)
+          pstmt.setLong(8, telemetry.measurementTsMs)
+          pstmt.setString(9, telemetry.macAddress.mkString(","))
+          pstmt.executeUpdate()
+        finally pstmt.close()
+      }
+    yield ()
