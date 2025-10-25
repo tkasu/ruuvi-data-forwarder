@@ -44,7 +44,7 @@ class DuckDBSensorValuesSink(
     ZIO.acquireRelease(
       ZIO.attemptBlocking {
         // Create parent directories if needed (for file-based databases)
-        if (path != ":memory:")
+        if path != ":memory:" then
           val dbFilePath = Paths.get(path)
           Option(dbFilePath.getParent).foreach(Files.createDirectories(_))
 
@@ -52,7 +52,7 @@ class DuckDBSensorValuesSink(
         Class.forName("org.duckdb.DuckDBDriver")
         // Connect to DuckDB (file-based or in-memory)
         val jdbcUrl =
-          if (path == ":memory:") "jdbc:duckdb:" else s"jdbc:duckdb:$path"
+          if path == ":memory:" then "jdbc:duckdb:" else s"jdbc:duckdb:$path"
         DriverManager.getConnection(jdbcUrl)
       }
     )(conn => ZIO.attemptBlocking(conn.close()).orDie)

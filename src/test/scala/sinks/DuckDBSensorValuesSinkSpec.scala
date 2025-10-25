@@ -10,7 +10,9 @@ import java.nio.file.{Files, Paths}
 object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
 
   def spec = suite("DuckDBSensorValuesSinkSpec")(
-    test("DuckDBSensorValuesSink should write telemetry to in-memory database") {
+    test(
+      "DuckDBSensorValuesSink should write telemetry to in-memory database"
+    ) {
       // Note: For in-memory testing, we need to use a file-based database
       // because DuckDB in-memory databases are per-connection and don't persist
       // between different connection instances
@@ -42,7 +44,11 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val testData = List(testTelemetry1, testTelemetry2)
       val sink =
-        DuckDBSensorValuesSink(tempFile.toString, "test_telemetry", debugLogging = false)
+        DuckDBSensorValuesSink(
+          tempFile.toString,
+          "test_telemetry",
+          debugLogging = false
+        )
 
       val writeAndRead = for
         // Write test data to database
@@ -51,12 +57,15 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         // Read data from database
         records <- ZIO.attemptBlocking {
           Class.forName("org.duckdb.DuckDBDriver")
-          val conn = DriverManager.getConnection(s"jdbc:duckdb:${tempFile.toString}")
+          val conn =
+            DriverManager.getConnection(s"jdbc:duckdb:${tempFile.toString}")
           val stmt = conn.createStatement()
-          val rs = stmt.executeQuery("SELECT * FROM test_telemetry ORDER BY measurement_ts_ms")
-          
+          val rs = stmt.executeQuery(
+            "SELECT * FROM test_telemetry ORDER BY measurement_ts_ms"
+          )
+
           val results = scala.collection.mutable.ListBuffer[RuuviTelemetry]()
-          while (rs.next()) {
+          while rs.next() do
             results += RuuviTelemetry(
               temperatureMillicelsius = rs.getInt("temperature_millicelsius"),
               humidity = rs.getInt("humidity"),
@@ -64,12 +73,13 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
               batteryPotential = rs.getInt("battery_potential"),
               txPower = rs.getInt("tx_power"),
               movementCounter = rs.getInt("movement_counter"),
-              measurementSequenceNumber = rs.getInt("measurement_sequence_number"),
+              measurementSequenceNumber =
+                rs.getInt("measurement_sequence_number"),
               measurementTsMs = rs.getLong("measurement_ts_ms"),
-              macAddress = rs.getString("mac_address").split(",").map(_.toShort).toSeq
+              macAddress =
+                rs.getString("mac_address").split(",").map(_.toShort).toSeq
             )
-          }
-          
+
           rs.close()
           stmt.close()
           conn.close()
@@ -101,7 +111,11 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
       )
 
       val sink =
-        DuckDBSensorValuesSink(tempFile.toString, "telemetry", debugLogging = false)
+        DuckDBSensorValuesSink(
+          tempFile.toString,
+          "telemetry",
+          debugLogging = false
+        )
 
       val writeAndVerify = for
         _ <- ZStream.fromIterable(List(testTelemetry)).run(sink.make)
@@ -112,10 +126,11 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         // Read data back
         record <- ZIO.attemptBlocking {
           Class.forName("org.duckdb.DuckDBDriver")
-          val conn = DriverManager.getConnection(s"jdbc:duckdb:${tempFile.toString}")
+          val conn =
+            DriverManager.getConnection(s"jdbc:duckdb:${tempFile.toString}")
           val stmt = conn.createStatement()
           val rs = stmt.executeQuery("SELECT * FROM telemetry LIMIT 1")
-          
+
           rs.next()
           val result = RuuviTelemetry(
             temperatureMillicelsius = rs.getInt("temperature_millicelsius"),
@@ -124,11 +139,13 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
             batteryPotential = rs.getInt("battery_potential"),
             txPower = rs.getInt("tx_power"),
             movementCounter = rs.getInt("movement_counter"),
-            measurementSequenceNumber = rs.getInt("measurement_sequence_number"),
+            measurementSequenceNumber =
+              rs.getInt("measurement_sequence_number"),
             measurementTsMs = rs.getLong("measurement_ts_ms"),
-            macAddress = rs.getString("mac_address").split(",").map(_.toShort).toSeq
+            macAddress =
+              rs.getString("mac_address").split(",").map(_.toShort).toSeq
           )
-          
+
           rs.close()
           stmt.close()
           conn.close()
@@ -143,7 +160,9 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         Assertion.equalTo((true, testTelemetry))
       }
     },
-    test("DuckDBSensorValuesSink should create parent directories if they don't exist") {
+    test(
+      "DuckDBSensorValuesSink should create parent directories if they don't exist"
+    ) {
       val tempDir = Files.createTempDirectory("ruuvi-test-dir-")
       val nestedPath = tempDir.resolve("nested/path/telemetry.db")
 
@@ -160,7 +179,11 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
       )
 
       val sink =
-        DuckDBSensorValuesSink(nestedPath.toString, "telemetry", debugLogging = false)
+        DuckDBSensorValuesSink(
+          nestedPath.toString,
+          "telemetry",
+          debugLogging = false
+        )
 
       val writeAndVerify = for
         _ <- ZStream.fromIterable(List(testTelemetry)).run(sink.make)
@@ -169,10 +192,11 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
 
         record <- ZIO.attemptBlocking {
           Class.forName("org.duckdb.DuckDBDriver")
-          val conn = DriverManager.getConnection(s"jdbc:duckdb:${nestedPath.toString}")
+          val conn =
+            DriverManager.getConnection(s"jdbc:duckdb:${nestedPath.toString}")
           val stmt = conn.createStatement()
           val rs = stmt.executeQuery("SELECT * FROM telemetry LIMIT 1")
-          
+
           rs.next()
           val result = RuuviTelemetry(
             temperatureMillicelsius = rs.getInt("temperature_millicelsius"),
@@ -181,11 +205,13 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
             batteryPotential = rs.getInt("battery_potential"),
             txPower = rs.getInt("tx_power"),
             movementCounter = rs.getInt("movement_counter"),
-            measurementSequenceNumber = rs.getInt("measurement_sequence_number"),
+            measurementSequenceNumber =
+              rs.getInt("measurement_sequence_number"),
             measurementTsMs = rs.getLong("measurement_ts_ms"),
-            macAddress = rs.getString("mac_address").split(",").map(_.toShort).toSeq
+            macAddress =
+              rs.getString("mac_address").split(",").map(_.toShort).toSeq
           )
-          
+
           rs.close()
           stmt.close()
           conn.close()
@@ -238,7 +264,11 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
       )
 
       val sink =
-        DuckDBSensorValuesSink(tempFile.toString, "telemetry", debugLogging = false)
+        DuckDBSensorValuesSink(
+          tempFile.toString,
+          "telemetry",
+          debugLogging = false
+        )
 
       val writeAndRead = for
         // Write first batch
@@ -250,12 +280,15 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         // Read all records
         records <- ZIO.attemptBlocking {
           Class.forName("org.duckdb.DuckDBDriver")
-          val conn = DriverManager.getConnection(s"jdbc:duckdb:${tempFile.toString}")
+          val conn =
+            DriverManager.getConnection(s"jdbc:duckdb:${tempFile.toString}")
           val stmt = conn.createStatement()
-          val rs = stmt.executeQuery("SELECT * FROM telemetry ORDER BY measurement_ts_ms")
-          
+          val rs = stmt.executeQuery(
+            "SELECT * FROM telemetry ORDER BY measurement_ts_ms"
+          )
+
           val results = scala.collection.mutable.ListBuffer[RuuviTelemetry]()
-          while (rs.next()) {
+          while rs.next() do
             results += RuuviTelemetry(
               temperatureMillicelsius = rs.getInt("temperature_millicelsius"),
               humidity = rs.getInt("humidity"),
@@ -263,12 +296,13 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
               batteryPotential = rs.getInt("battery_potential"),
               txPower = rs.getInt("tx_power"),
               movementCounter = rs.getInt("movement_counter"),
-              measurementSequenceNumber = rs.getInt("measurement_sequence_number"),
+              measurementSequenceNumber =
+                rs.getInt("measurement_sequence_number"),
               measurementTsMs = rs.getLong("measurement_ts_ms"),
-              macAddress = rs.getString("mac_address").split(",").map(_.toShort).toSeq
+              macAddress =
+                rs.getString("mac_address").split(",").map(_.toShort).toSeq
             )
-          }
-          
+
           rs.close()
           stmt.close()
           conn.close()
