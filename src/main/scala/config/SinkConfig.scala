@@ -21,8 +21,6 @@ object SinkType:
         )
     }
 
-import zio.config.magnolia.name
-
 case class JsonLinesConfig(
     path: String,
     @name("debug-logging")
