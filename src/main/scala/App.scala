@@ -10,6 +10,7 @@ import _root_.config.{
   SinkConfig,
   SinkType,
   JsonLinesConfig,
+  DuckDBConfig,
   HttpConfig
 }
 
@@ -76,6 +77,28 @@ object App extends ZIOAppDefault:
             ZIO.fail(
               RuntimeException(
                 "JSON Lines sink selected but configuration is missing"
+              )
+            )
+
+      case SinkType.DuckDB =>
+        sinkConfig.duckdb match
+          case Some(duckdbConfig) =>
+            ZIO.logInfo(s"Using DuckDB sink: ${duckdbConfig.path}") *>
+              ZIO.logInfo(s"Table name: ${duckdbConfig.tableName}") *>
+              ZIO.logInfo(
+                s"Debug logging enabled: ${duckdbConfig.debugLogging}"
+              ) *>
+              ZIO.succeed(
+                DuckDBSensorValuesSink(
+                  duckdbConfig.path,
+                  duckdbConfig.tableName,
+                  duckdbConfig.debugLogging
+                )
+              )
+          case None =>
+            ZIO.fail(
+              RuntimeException(
+                "DuckDB sink selected but configuration is missing"
               )
             )
 
