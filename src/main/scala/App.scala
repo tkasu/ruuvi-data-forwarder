@@ -32,7 +32,8 @@ object App extends ZIOAppDefault:
     * @param sinkCreator
     *   Sink that consumes sensor telemetry chunks
     * @return
-    *   ZIO effect that runs forever, catching and logging parse errors
+    *   ZIO effect that runs until the source stream completes, catching and
+    *   logging parse errors
     */
   def forwarder(
       sourceCreator: SensorValuesSource,
@@ -51,7 +52,6 @@ object App extends ZIOAppDefault:
       .catchSome { case e: RuuviParseError =>
         ZIO.logError(s"Error parsing telemetry: ${e.getMessage}")
       }
-      .forever
 
   /** Selects and initializes the appropriate sink based on configuration.
     *
