@@ -10,7 +10,7 @@ object ConsoleSensorValuesSource extends SensorValuesSource:
     val consoleParser: ZIO[Any, Option[SourceError], RuuviTelemetry] = (for
       inputString <- Console.readLine.mapError {
         case _: java.io.EOFException => None
-        case other                   => Some(RuuviParseError(other.getMessage, other))
+        case other => Some(RuuviParseError(other.getMessage, other))
       }
       maybeJson = inputString.fromJson[RuuviTelemetry]
       json <- ZIO
