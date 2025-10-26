@@ -65,7 +65,10 @@ class HttpSensorValuesSink(
         .logDebug(s"Request payload: $json")
         .when(debugLogging)
       // URL encode sensor name and construct URL properly
-      encodedSensorName = URLEncoder.encode(sensorName, StandardCharsets.UTF_8.name())
+      encodedSensorName = URLEncoder.encode(
+        sensorName,
+        StandardCharsets.UTF_8.name()
+      )
       url = s"${apiUrl.stripSuffix("/")}/telemetry/$encodedSensorName"
       // Prepare body with proper headers
       bodyBytes = json.getBytes(StandardCharsets.UTF_8)
