@@ -400,7 +400,10 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
 
         ZStream
           .fromIterable(List(testTelemetry))
-          .groupedWithin(sink.desiredBatchSize, zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong))
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
           .run(sink.make)
           .flip
           .map(_.getMessage)
