@@ -144,23 +144,45 @@ object App extends ZIOAppDefault:
     appConfig <- ZIO.config(AppConfig.descriptor)
     _ <- ZIO.logInfo("Starting Ruuvi Data Forwarder")
     _ <- ZIO.logInfo("Reading from StdIn")
-    sink <- selectSink(appConfig.sink)
     _ <- appConfig.sink.sinkType match
       case SinkType.DuckDB =>
-        // Use batching forwarder for DuckDB
-        batchingForwarder(
-          ConsoleSensorValuesSource,
-          sink.asInstanceOf[DuckDBSensorValuesSink]
-        )
-          .catchSome { case _: StreamShutdown =>
-            ZIO.logInfo("Stream completed - shutting down")
-          }
+        appConfig.sink.duckdb match
+          case Some(duckdbConfig) =>
+            val duckdbSink = DuckDBSensorValuesSink(
+              duckdbConfig.path,
+              duckdbConfig.tableName,
+              duckdbConfig.debugLogging,
+              duckdbConfig.desiredBatchSize,
+              duckdbConfig.desiredMaxBatchLatencySeconds
+            )
+            ZIO.logInfo(s"Using DuckDB sink: ${duckdbConfig.path}") *>
+              ZIO.logInfo(s"Table name: ${duckdbConfig.tableName}") *>
+              ZIO.logInfo(
+                s"Debug logging enabled: ${duckdbConfig.debugLogging}"
+              ) *>
+              ZIO.logInfo(s"Batch size: ${duckdbConfig.desiredBatchSize}") *>
+              ZIO.logInfo(
+                s"Batch latency: ${duckdbConfig.desiredMaxBatchLatencySeconds}s"
+              ) *>
+              batchingForwarder(ConsoleSensorValuesSource, duckdbSink)
+                .catchSome { case _: StreamShutdown =>
+                  ZIO.logInfo("Stream completed - shutting down")
+                }
+          case None =>
+            ZIO.fail(
+              RuntimeException(
+                "DuckDB sink selected but configuration is missing"
+              )
+            )
       case _ =>
         // Use regular forwarder for other sinks
-        forwarder(ConsoleSensorValuesSource, sink)
-          .catchSome { case _: StreamShutdown =>
-            ZIO.logInfo("Stream completed - shutting down")
-          }
+        for
+          sink <- selectSink(appConfig.sink)
+          _ <- forwarder(ConsoleSensorValuesSource, sink)
+            .catchSome { case _: StreamShutdown =>
+              ZIO.logInfo("Stream completed - shutting down")
+            }
+        yield ()
   yield ()).provide(
     Runtime.removeDefaultLoggers >>> SLF4J.slf4j
   )
