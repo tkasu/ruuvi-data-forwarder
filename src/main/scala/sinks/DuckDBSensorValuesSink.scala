@@ -45,6 +45,11 @@ class DuckDBSensorValuesSink(
                 s"Inserting batch of ${batch.size} records into DuckDB table $tableName"
               )
               _ <- insertBatch(dbPath, tableName, batch)
+                .tapError(err =>
+                  ZIO.logError(
+                    s"Failed to insert batch of ${batch.size} records: ${err.getMessage}"
+                  )
+                )
             yield ()
           else ZIO.unit
         }
@@ -68,6 +73,11 @@ class DuckDBSensorValuesSink(
           s"Inserting batch of ${telemetryBatch.size} records into DuckDB table $tableName"
         ) *>
         insertBatch(dbPath, tableName, telemetryBatch)
+          .tapError(err =>
+            ZIO.logError(
+              s"Failed to insert batch of ${telemetryBatch.size} records: ${err.getMessage}"
+            )
+          )
     else ZIO.unit
 
   private def insertBatch(

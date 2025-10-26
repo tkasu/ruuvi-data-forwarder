@@ -146,34 +146,22 @@ object App extends ZIOAppDefault:
     _ <- ZIO.logInfo("Reading from StdIn")
     _ <- appConfig.sink.sinkType match
       case SinkType.DuckDB =>
-        appConfig.sink.duckdb match
-          case Some(duckdbConfig) =>
-            val duckdbSink = DuckDBSensorValuesSink(
-              duckdbConfig.path,
-              duckdbConfig.tableName,
-              duckdbConfig.debugLogging,
-              duckdbConfig.desiredBatchSize,
-              duckdbConfig.desiredMaxBatchLatencySeconds
-            )
-            ZIO.logInfo(s"Using DuckDB sink: ${duckdbConfig.path}") *>
-              ZIO.logInfo(s"Table name: ${duckdbConfig.tableName}") *>
-              ZIO.logInfo(
-                s"Debug logging enabled: ${duckdbConfig.debugLogging}"
-              ) *>
-              ZIO.logInfo(s"Batch size: ${duckdbConfig.desiredBatchSize}") *>
-              ZIO.logInfo(
-                s"Batch latency: ${duckdbConfig.desiredMaxBatchLatencySeconds}s"
-              ) *>
-              batchingForwarder(ConsoleSensorValuesSource, duckdbSink)
-                .catchSome { case _: StreamShutdown =>
-                  ZIO.logInfo("Stream completed - shutting down")
-                }
-          case None =>
-            ZIO.fail(
-              RuntimeException(
-                "DuckDB sink selected but configuration is missing"
+        // Use batching forwarder for DuckDB with selectSink to avoid duplication
+        for
+          sink <- selectSink(appConfig.sink)
+          duckdbSink <- sink match
+            case s: DuckDBSensorValuesSink => ZIO.succeed(s)
+            case _ =>
+              ZIO.fail(
+                RuntimeException(
+                  "Expected DuckDB sink but got a different type"
+                )
               )
-            )
+          _ <- batchingForwarder(ConsoleSensorValuesSource, duckdbSink)
+            .catchSome { case _: StreamShutdown =>
+              ZIO.logInfo("Stream completed - shutting down")
+            }
+        yield ()
       case _ =>
         // Use regular forwarder for other sinks
         for
