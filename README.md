@@ -133,8 +133,12 @@ Sends telemetry data to a ruuvitag-api compatible HTTP endpoint. Each RuuviTelem
 **Features:**
 - Transforms Ruuvi telemetry to ruuvitag-api format
 - Posts each measurement type separately
-- Automatic retry on failure (via ZIO HTTP)
+- Automatic retry with exponential backoff (configurable)
+- Request timeout protection (configurable)
+- Error recovery to prevent stream crashes
 - Debug logging of each HTTP request (configurable)
+- MAC address validation
+- URL encoding for sensor names
 
 **Configuration:**
 ```shell
@@ -143,6 +147,8 @@ export RUUVI_SINK_TYPE=http
 export RUUVI_HTTP_API_URL=http://localhost:8080/v1  # Optional, default shown
 export RUUVI_HTTP_SENSOR_NAME=default-sensor        # Optional, default shown
 export RUUVI_HTTP_DEBUG_LOGGING=true                # Optional, default shown
+export RUUVI_HTTP_TIMEOUT_SECONDS=30                # Optional, default shown
+export RUUVI_HTTP_MAX_RETRIES=3                     # Optional, default shown
 
 # Run
 java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
@@ -207,6 +213,8 @@ sink {
       api-url = "http://localhost:8080/v1"  # ruuvitag-api base URL
       sensor-name = "default-sensor"        # Sensor name for API requests
       debug-logging = true                  # Log each HTTP request to debug level
+      timeout-seconds = 30                  # HTTP request timeout in seconds
+      max-retries = 3                       # Maximum retry attempts for failed requests
     }
   }
 ```
@@ -221,6 +229,8 @@ sink {
 - `RUUVI_HTTP_API_URL` - Base URL for ruuvitag-api HTTP sink
 - `RUUVI_HTTP_SENSOR_NAME` - Sensor name for HTTP sink API requests
 - `RUUVI_HTTP_DEBUG_LOGGING` - Enable/disable debug logging for HTTP sink (`true`/`false`)
+- `RUUVI_HTTP_TIMEOUT_SECONDS` - HTTP request timeout in seconds (default: 30)
+- `RUUVI_HTTP_MAX_RETRIES` - Maximum retry attempts for failed HTTP requests (default: 3)
 
 ### Development
 

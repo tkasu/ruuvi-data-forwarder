@@ -110,11 +110,16 @@ object App extends ZIOAppDefault:
               ZIO.logInfo(
                 s"Debug logging enabled: ${httpConfig.debugLogging}"
               ) *>
+              ZIO.logInfo(
+                s"Timeout: ${httpConfig.timeoutSeconds}s, Max retries: ${httpConfig.maxRetries}"
+              ) *>
               ZIO.succeed(
                 HttpSensorValuesSink(
                   httpConfig.apiUrl,
                   httpConfig.sensorName,
-                  httpConfig.debugLogging
+                  httpConfig.debugLogging,
+                  httpConfig.timeoutSeconds,
+                  httpConfig.maxRetries
                 )
               )
           case None =>

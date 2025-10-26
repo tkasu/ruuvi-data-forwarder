@@ -48,7 +48,11 @@ case class HttpConfig(
     @name("sensor-name")
     sensorName: String,
     @name("debug-logging")
-    debugLogging: Boolean
+    debugLogging: Boolean,
+    @name("timeout-seconds")
+    timeoutSeconds: Int = 30,
+    @name("max-retries")
+    maxRetries: Int = 3
 )
 
 object HttpConfig:
