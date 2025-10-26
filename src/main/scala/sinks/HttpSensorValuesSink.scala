@@ -14,7 +14,9 @@ class HttpSensorValuesSink(
     sensorName: String,
     debugLogging: Boolean,
     timeoutSeconds: Int = 30,
-    maxRetries: Int = 3
+    maxRetries: Int = 3,
+    val desiredBatchSize: Int = 1,
+    val desiredMaxBatchLatencySeconds: Int = 5
 ) extends SensorValuesSink:
 
   // Data models for the ruuvitag-api request format
@@ -37,22 +39,24 @@ class HttpSensorValuesSink(
     implicit val encoder: JsonEncoder[TelemetryData] =
       DeriveJsonEncoder.gen[TelemetryData]
 
-  def make: ZSink[Any, Throwable, RuuviTelemetry, Nothing, Unit] =
-    ZSink.foreach { telemetry =>
-      for
-        _ <- ZIO
-          .logDebug(
-            s"Sending telemetry to HTTP API ($apiUrl): ${telemetry.macAddress.mkString(",")}"
-          )
-          .when(debugLogging)
-        // Send telemetry with proper error handling
-        _ <- sendTelemetry(telemetry).catchAll { error =>
-          // Always log and continue - never crash the stream
-          ZIO.logError(
-            s"Failed to send telemetry: ${error.getMessage}"
-          ) *> ZIO.unit
-        }
-      yield ()
+  def make: ZSink[Any, Throwable, Chunk[RuuviTelemetry], Nothing, Unit] =
+    ZSink.foreach { chunk =>
+      ZIO.foreachDiscard(chunk) { telemetry =>
+        for
+          _ <- ZIO
+            .logDebug(
+              s"Sending telemetry to HTTP API ($apiUrl): ${telemetry.macAddress.mkString(",")}"
+            )
+            .when(debugLogging)
+          // Send telemetry with proper error handling
+          _ <- sendTelemetry(telemetry).catchAll { error =>
+            // Always log and continue - never crash the stream
+            ZIO.logError(
+              s"Failed to send telemetry: ${error.getMessage}"
+            ) *> ZIO.unit
+          }
+        yield ()
+      }
     }
 
   private def sendTelemetry(
