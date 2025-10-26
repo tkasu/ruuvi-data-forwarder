@@ -6,12 +6,12 @@ A Scala 3 + ZIO-based middleware for processing and forwarding Ruuvi Tag sensor 
 
 ### Features
 
-- ✅ **Multiple Sinks**: Console (stdout), JSON Lines (file), and DuckDB (database) sinks
+- ✅ **Multiple Sinks**: Console (stdout), JSON Lines (file), DuckDB (database), and HTTP (ruuvitag-api) sinks
 - ✅ **Configuration**: Type-safe config with HOCON + environment variable overrides
 - ✅ **Structured Logging**: ZIO logging with SLF4J/Logback backend
 - ✅ **Stream Processing**: ZIO Streams with backpressure support
 - ✅ **Type Safety**: Compile-time JSON validation and derivation
-- 🚧 **Future**: HTTP, S3, PostgreSQL, Kafka sinks (planned)
+- 🚧 **Future**: S3, PostgreSQL, Kafka sinks (planned)
 
 ### Requirements
 
@@ -126,6 +126,69 @@ SELECT * FROM telemetry WHERE mac_address = 'D5:12:34:66:14:14';
 - Timestamps are stored as milliseconds since epoch
 - All sensor values stored as integers for precision
 
+#### 4. HTTP Sink
+
+Sends telemetry data to a ruuvitag-api compatible HTTP endpoint. Each RuuviTelemetry record is transformed into multiple measurements (temperature, humidity, pressure, battery, etc.) and posted to the API.
+
+**Features:**
+- Transforms Ruuvi telemetry to ruuvitag-api format
+- Posts each measurement type separately
+- Automatic retry with exponential backoff (configurable)
+- Request timeout protection (configurable)
+- Error recovery to prevent stream crashes
+- Debug logging of each HTTP request (configurable)
+- MAC address validation
+- URL encoding for sensor names
+
+**Configuration:**
+```shell
+# Set via environment variables
+export RUUVI_SINK_TYPE=http
+export RUUVI_HTTP_API_URL=http://localhost:8081  # Optional, default shown
+export RUUVI_HTTP_SENSOR_NAME=default-sensor        # Optional, default shown
+export RUUVI_HTTP_DEBUG_LOGGING=true                # Optional, default shown
+export RUUVI_HTTP_TIMEOUT_SECONDS=30                # Optional, default shown
+export RUUVI_HTTP_MAX_RETRIES=3                     # Optional, default shown
+
+# Run
+java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+```
+
+Or inline:
+```shell
+RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://localhost:8081 RUUVI_HTTP_SENSOR_NAME=my-sensor java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+```
+
+**API Format:**
+
+The sink posts to `/telemetry/{sensorName}` with payload (truncated example showing 2 of 7 measurement types):
+```json
+[
+  {
+    "telemetry_type": "temperature",
+    "data": [
+      {
+        "sensor_name": "FE:26:88:7A:66:66",
+        "timestamp": 1693460525699,
+        "value": -29.02
+      }
+    ]
+  },
+  {
+    "telemetry_type": "humidity",
+    "data": [
+      {
+        "sensor_name": "FE:26:88:7A:66:66",
+        "timestamp": 1693460525699,
+        "value": 65.3675
+      }
+    ]
+  }
+]
+```
+
+Each telemetry record generates 7 separate measurement types: `temperature`, `humidity`, `pressure`, `battery`, `tx_power`, `movement_counter`, and `measurement_sequence_number`.
+
 ### Configuration
 
 Configuration is loaded from `src/main/resources/application.conf` with environment variable overrides.
@@ -133,7 +196,7 @@ Configuration is loaded from `src/main/resources/application.conf` with environm
 **Default Configuration:**
 ```hocon
 sink {
-    sink-type = "console"              # "console", "jsonlines", or "duckdb"
+    sink-type = "console"              # "console", "jsonlines", "duckdb", or "http"
 
     json-lines {
       path = "data/telemetry.jsonl"    # Output file path
@@ -145,16 +208,29 @@ sink {
       table-name = "telemetry"         # Table name for storing telemetry
       debug-logging = true              # Log each telemetry to debug level
     }
+
+    http {
+      api-url = "http://localhost:8081"  # ruuvitag-api base URL
+      sensor-name = "default-sensor"        # Sensor name for API requests
+      debug-logging = true                  # Log each HTTP request to debug level
+      timeout-seconds = 30                  # HTTP request timeout in seconds
+      max-retries = 3                       # Maximum retry attempts for failed requests
+    }
   }
 ```
 
 **Environment Variables:**
-- `RUUVI_SINK_TYPE` - Sink type: `console`, `jsonlines`, or `duckdb`
+- `RUUVI_SINK_TYPE` - Sink type: `console`, `jsonlines`, `duckdb`, or `http`
 - `RUUVI_JSONLINES_PATH` - Output file path for JSON Lines sink
 - `RUUVI_JSONLINES_DEBUG_LOGGING` - Enable/disable debug logging (`true`/`false`)
 - `RUUVI_DUCKDB_PATH` - Database file path for DuckDB sink (use `:memory:` for in-memory)
 - `RUUVI_DUCKDB_TABLE_NAME` - Table name for DuckDB sink
 - `RUUVI_DUCKDB_DEBUG_LOGGING` - Enable/disable debug logging (`true`/`false`)
+- `RUUVI_HTTP_API_URL` - Base URL for ruuvitag-api HTTP sink
+- `RUUVI_HTTP_SENSOR_NAME` - Sensor name for HTTP sink API requests
+- `RUUVI_HTTP_DEBUG_LOGGING` - Enable/disable debug logging for HTTP sink (`true`/`false`)
+- `RUUVI_HTTP_TIMEOUT_SECONDS` - HTTP request timeout in seconds (default: 30)
+- `RUUVI_HTTP_MAX_RETRIES` - Maximum retry attempts for failed HTTP requests (default: 3)
 
 ### Development
 
@@ -228,6 +304,9 @@ ruuvi-reader-rs | RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.6.2/ruuvi-d
 # Save to DuckDB database
 ruuvi-reader-rs | RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 # Data saved to: data/telemetry.db
+
+# Send to HTTP API
+ruuvi-reader-rs | RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com RUUVI_HTTP_SENSOR_NAME=outdoor-sensor java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 #### From File
@@ -248,6 +327,13 @@ cat telemetry.jsonl | \
   RUUVI_DUCKDB_PATH=/var/data/sensor.db \
   RUUVI_DUCKDB_TABLE_NAME=ruuvi_data \
   java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+
+# HTTP sink with custom API
+cat telemetry.jsonl | \
+  RUUVI_SINK_TYPE=http \
+  RUUVI_HTTP_API_URL=http://api.example.com \
+  RUUVI_HTTP_SENSOR_NAME=my-sensor \
+  java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 #### Fan-out to Multiple Sinks
@@ -257,6 +343,7 @@ cat telemetry.jsonl | \
 ruuvi-reader-rs | tee \
   >(RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
   >(RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
+  >(RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
   >(java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar)
 ```
 
