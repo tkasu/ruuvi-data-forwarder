@@ -59,7 +59,9 @@ object App extends ZIOAppDefault:
     source
       .groupedWithin(
         duckdbSink.desiredBatchSize,
-        zio.Duration.fromSeconds(duckdbSink.desiredMaxBatchLatencySeconds.toLong)
+        zio.Duration.fromSeconds(
+          duckdbSink.desiredMaxBatchLatencySeconds.toLong
+        )
       )
       .mapZIO { batch =>
         duckdbSink.insertBatchDirect(batch.toList)
@@ -146,7 +148,10 @@ object App extends ZIOAppDefault:
     _ <- appConfig.sink.sinkType match
       case SinkType.DuckDB =>
         // Use batching forwarder for DuckDB
-        batchingForwarder(ConsoleSensorValuesSource, sink.asInstanceOf[DuckDBSensorValuesSink])
+        batchingForwarder(
+          ConsoleSensorValuesSource,
+          sink.asInstanceOf[DuckDBSensorValuesSink]
+        )
           .catchSome { case _: StreamShutdown =>
             ZIO.logInfo("Stream completed - shutting down")
           }

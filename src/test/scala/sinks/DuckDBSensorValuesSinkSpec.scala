@@ -380,5 +380,245 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
           Assertion.containsString("Invalid table name")
         )
       )
+    },
+    test("DuckDBSensorValuesSink should batch multiple records efficiently") {
+      val tempFile = Files.createTempFile("ruuvi-test-batch-", ".db")
+      Files.deleteIfExists(tempFile)
+
+      // Create a batch of 10 telemetry records
+      val testBatch = (1 to 10).map { i =>
+        RuuviTelemetry(
+          batteryPotential = 2000 + i,
+          humidity = 500000 + i * 1000,
+          macAddress = Seq(254, 38, 136, 122, 102, i.toShort),
+          measurementTsMs = 1693460525699L + i,
+          measurementSequenceNumber = 53300 + i,
+          movementCounter = i,
+          pressure = 100000 + i * 100,
+          temperatureMillicelsius = 20000 + i * 100,
+          txPower = 4
+        )
+      }.toList
+
+      val sink =
+        DuckDBSensorValuesSink(
+          tempFile.toString,
+          "telemetry",
+          debugLogging = false,
+          desiredBatchSize = 5,
+          desiredMaxBatchLatencySeconds = 30
+        )
+
+      val writeAndVerify = for
+        // Write all records in one batch
+        _ <- ZStream.fromIterable(testBatch).run(sink.make)
+
+        // Verify all records were written
+        count <- ZIO.attemptBlocking {
+          Class.forName("org.duckdb.DuckDBDriver")
+          val conn =
+            DriverManager.getConnection(s"jdbc:duckdb:${tempFile.toString}")
+          val stmt = conn.createStatement()
+          val rs = stmt.executeQuery("SELECT COUNT(*) as count FROM telemetry")
+
+          rs.next()
+          val result = rs.getInt("count")
+
+          rs.close()
+          stmt.close()
+          conn.close()
+          result
+        }
+
+        // Clean up
+        _ <- ZIO.attempt(Files.deleteIfExists(tempFile))
+      yield count
+
+      assertZIO(writeAndVerify)(Assertion.equalTo(10))
+    },
+    test(
+      "DuckDBSensorValuesSink insertBatchDirect should insert multiple records"
+    ) {
+      val tempFile = Files.createTempFile("ruuvi-test-direct-batch-", ".db")
+      Files.deleteIfExists(tempFile)
+
+      val testBatch = List(
+        RuuviTelemetry(
+          batteryPotential = 2335,
+          humidity = 653675,
+          macAddress = Seq(254, 38, 136, 122, 102, 102),
+          measurementTsMs = 1693460525699L,
+          measurementSequenceNumber = 53300,
+          movementCounter = 2,
+          pressure = 100755,
+          temperatureMillicelsius = -29020,
+          txPower = 4
+        ),
+        RuuviTelemetry(
+          batteryPotential = 2176,
+          humidity = 576425,
+          macAddress = Seq(213, 18, 52, 102, 20, 20),
+          measurementTsMs = 1693460525701L,
+          measurementSequenceNumber = 1589,
+          movementCounter = 79,
+          pressure = 100556,
+          temperatureMillicelsius = 22080,
+          txPower = 4
+        ),
+        RuuviTelemetry(
+          batteryPotential = 2500,
+          humidity = 600000,
+          macAddress = Seq(100, 200, 50, 75, 125, 150),
+          measurementTsMs = 1693460525702L,
+          measurementSequenceNumber = 2000,
+          movementCounter = 100,
+          pressure = 101000,
+          temperatureMillicelsius = 25000,
+          txPower = 4
+        )
+      )
+
+      val sink =
+        DuckDBSensorValuesSink(
+          tempFile.toString,
+          "telemetry",
+          debugLogging = false,
+          desiredBatchSize = 5,
+          desiredMaxBatchLatencySeconds = 30
+        )
+
+      val writeAndRead = for
+        // Insert batch directly
+        _ <- sink.insertBatchDirect(testBatch)
+
+        // Read all records
+        records <- ZIO.attemptBlocking {
+          Class.forName("org.duckdb.DuckDBDriver")
+          val conn =
+            DriverManager.getConnection(s"jdbc:duckdb:${tempFile.toString}")
+          val stmt = conn.createStatement()
+          val rs = stmt.executeQuery(
+            "SELECT * FROM telemetry ORDER BY measurement_ts_ms"
+          )
+
+          val results = scala.collection.mutable.ListBuffer[RuuviTelemetry]()
+          while rs.next() do
+            results += RuuviTelemetry(
+              temperatureMillicelsius = rs.getInt("temperature_millicelsius"),
+              humidity = rs.getInt("humidity"),
+              pressure = rs.getInt("pressure"),
+              batteryPotential = rs.getInt("battery_potential"),
+              txPower = rs.getInt("tx_power"),
+              movementCounter = rs.getInt("movement_counter"),
+              measurementSequenceNumber =
+                rs.getInt("measurement_sequence_number"),
+              measurementTsMs = rs.getLong("measurement_ts_ms"),
+              macAddress = rs
+                .getString("mac_address")
+                .split(":")
+                .map(Integer.parseInt(_, 16).toShort)
+                .toSeq
+            )
+
+          rs.close()
+          stmt.close()
+          conn.close()
+          results.toList
+        }
+
+        // Clean up
+        _ <- ZIO.attempt(Files.deleteIfExists(tempFile))
+      yield records
+
+      assertZIO(writeAndRead)(Assertion.hasSameElements(testBatch))
+    },
+    test(
+      "DuckDBSensorValuesSink with groupedWithin should batch records by size and time"
+    ) {
+      val tempFile = Files.createTempFile("ruuvi-test-grouped-within-", ".db")
+      Files.deleteIfExists(tempFile)
+
+      // Create a small batch of 3 records (less than batch size of 5)
+      // This tests the timeout-based flushing
+      val testBatch = List(
+        RuuviTelemetry(
+          batteryPotential = 2335,
+          humidity = 653675,
+          macAddress = Seq(254, 38, 136, 122, 102, 102),
+          measurementTsMs = 1693460525699L,
+          measurementSequenceNumber = 53300,
+          movementCounter = 2,
+          pressure = 100755,
+          temperatureMillicelsius = -29020,
+          txPower = 4
+        ),
+        RuuviTelemetry(
+          batteryPotential = 2176,
+          humidity = 576425,
+          macAddress = Seq(213, 18, 52, 102, 20, 20),
+          measurementTsMs = 1693460525701L,
+          measurementSequenceNumber = 1589,
+          movementCounter = 79,
+          pressure = 100556,
+          temperatureMillicelsius = 22080,
+          txPower = 4
+        ),
+        RuuviTelemetry(
+          batteryPotential = 2500,
+          humidity = 600000,
+          macAddress = Seq(100, 200, 50, 75, 125, 150),
+          measurementTsMs = 1693460525702L,
+          measurementSequenceNumber = 2000,
+          movementCounter = 100,
+          pressure = 101000,
+          temperatureMillicelsius = 25000,
+          txPower = 4
+        )
+      )
+
+      val sink =
+        DuckDBSensorValuesSink(
+          tempFile.toString,
+          "telemetry",
+          debugLogging = false,
+          desiredBatchSize = 5,
+          desiredMaxBatchLatencySeconds = 1 // 1 second timeout for test
+        )
+
+      val writeWithBatching = for
+        // Simulate stream processing with groupedWithin
+        _ <- ZStream
+          .fromIterable(testBatch)
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .mapZIO { batch =>
+            sink.insertBatchDirect(batch.toList)
+          }
+          .runDrain
+
+        // Verify all records were written
+        count <- ZIO.attemptBlocking {
+          Class.forName("org.duckdb.DuckDBDriver")
+          val conn =
+            DriverManager.getConnection(s"jdbc:duckdb:${tempFile.toString}")
+          val stmt = conn.createStatement()
+          val rs = stmt.executeQuery("SELECT COUNT(*) as count FROM telemetry")
+
+          rs.next()
+          val result = rs.getInt("count")
+
+          rs.close()
+          stmt.close()
+          conn.close()
+          result
+        }
+
+        // Clean up
+        _ <- ZIO.attempt(Files.deleteIfExists(tempFile))
+      yield count
+
+      assertZIO(writeWithBatching)(Assertion.equalTo(3))
     }
   )

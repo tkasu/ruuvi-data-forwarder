@@ -51,9 +51,12 @@ class DuckDBSensorValuesSink(
       }
     }
 
-  /** Public method for direct batch insertion with logging. Used by batching forwarder.
+  /** Public method for direct batch insertion with logging. Used by batching
+    * forwarder.
     */
-  def insertBatchDirect(telemetryBatch: List[RuuviTelemetry]): ZIO[Any, Throwable, Unit] =
+  def insertBatchDirect(
+      telemetryBatch: List[RuuviTelemetry]
+  ): ZIO[Any, Throwable, Unit] =
     if telemetryBatch.nonEmpty then
       initializeDatabase *>
         ZIO
