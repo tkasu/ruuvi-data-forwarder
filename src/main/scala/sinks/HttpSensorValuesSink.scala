@@ -45,21 +45,20 @@ class HttpSensorValuesSink(
             s"Sending telemetry to HTTP API ($apiUrl): ${telemetry.macAddress.mkString(",")}"
           )
           .when(debugLogging)
-        // Add error recovery to prevent stream crashes
-        _ <- sendTelemetry(telemetry)
-          .retry(Schedule.exponential(1.second) && Schedule.recurs(maxRetries))
-          .catchAll { error =>
-            ZIO.logError(
-              s"Failed to send telemetry after ${maxRetries + 1} attempts: ${error.getMessage}"
-            ) *> ZIO.unit // Continue processing next record
-          }
+        // Send telemetry with proper error handling
+        _ <- sendTelemetry(telemetry).catchAll { error =>
+          // Always log and continue - never crash the stream
+          ZIO.logError(
+            s"Failed to send telemetry: ${error.getMessage}"
+          ) *> ZIO.unit
+        }
       yield ()
     }
 
   private def sendTelemetry(
       telemetry: RuuviTelemetry
   ): ZIO[Any, Throwable, Unit] =
-    for
+    val sendRequest = for
       payload <- ZIO.succeed(convertToApiFormat(telemetry))
       json <- ZIO.succeed(payload.toJson)
       _ <- ZIO
@@ -88,17 +87,33 @@ class HttpSensorValuesSink(
           )
         )
       // Consume response body to prevent resource leaks
-      _ <- response.body.asString
+      body <- response.body.asString
       _ <- response.status match
         case Status.Created =>
           ZIO.logInfo(s"Telemetry sent successfully to $url")
-        case status =>
+        case status if status.isClientError =>
+          // 4xx errors - client errors, don't retry, just log
+          ZIO.logWarning(
+            s"Client error sending telemetry to $url: ${status.code} ${response.status.text}. Response body: $body"
+          )
+        case status if status.isServerError =>
+          // 5xx errors - server errors, should be retried
           ZIO.fail(
             new RuntimeException(
-              s"HTTP request failed with status $status: ${response.status.text}"
+              s"Server error: ${status.code} ${response.status.text}"
             )
           )
+        case status =>
+          // Other unexpected status codes
+          ZIO.logWarning(
+            s"Unexpected status sending telemetry to $url: ${status.code} ${response.status.text}. Response body: $body"
+          )
     yield ()
+
+    // Retry only on server errors (5xx) and network/timeout errors
+    sendRequest.retry(
+      Schedule.exponential(1.second) && Schedule.recurs(maxRetries)
+    )
 
   // Converts single RuuviTelemetry into 7 measurement types per ruuvitag-api spec:
   // temperature, humidity, pressure, battery, tx_power, movement_counter, measurement_sequence_number
