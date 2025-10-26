@@ -43,7 +43,13 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val writeAndRead = for
         // Write test data to file
-        _ <- ZStream.fromIterable(testData).run(sink.make)
+        _ <- ZStream
+          .fromIterable(testData)
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         // Read file contents
         fileContent <- ZIO.attempt {
@@ -91,7 +97,13 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
         JsonLinesSensorValuesSink(nestedPath.toString, debugLogging = false)
 
       val writeAndVerify = for
-        _ <- ZStream.fromIterable(List(testTelemetry)).run(sink.make)
+        _ <- ZStream
+          .fromIterable(List(testTelemetry))
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         fileExists <- ZIO.attempt(Files.exists(nestedPath))
 
@@ -156,10 +168,22 @@ object JsonLinesSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val writeAndRead = for
         // Write first batch
-        _ <- ZStream.fromIterable(firstBatch).run(sink.make)
+        _ <- ZStream
+          .fromIterable(firstBatch)
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         // Write second batch (should append)
-        _ <- ZStream.fromIterable(secondBatch).run(sink.make)
+        _ <- ZStream
+          .fromIterable(secondBatch)
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         // Read all lines
         fileContent <- ZIO.attempt {

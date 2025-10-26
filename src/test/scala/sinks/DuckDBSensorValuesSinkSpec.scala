@@ -53,8 +53,14 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         )
 
       val writeAndRead = for
-        // Write test data to database
-        _ <- ZStream.fromIterable(testData).run(sink.make)
+        // Write test data to database (apply batching as the forwarder would)
+        _ <- ZStream
+          .fromIterable(testData)
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         // Read data from database
         records <- ZIO.attemptBlocking {
@@ -125,7 +131,13 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         )
 
       val writeAndVerify = for
-        _ <- ZStream.fromIterable(List(testTelemetry)).run(sink.make)
+        _ <- ZStream
+          .fromIterable(List(testTelemetry))
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         // Verify file exists
         fileExists <- ZIO.attempt(Files.exists(tempFile))
@@ -198,7 +210,13 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         )
 
       val writeAndVerify = for
-        _ <- ZStream.fromIterable(List(testTelemetry)).run(sink.make)
+        _ <- ZStream
+          .fromIterable(List(testTelemetry))
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         fileExists <- ZIO.attempt(Files.exists(nestedPath))
 
@@ -289,10 +307,22 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val writeAndRead = for
         // Write first batch
-        _ <- ZStream.fromIterable(firstBatch).run(sink.make)
+        _ <- ZStream
+          .fromIterable(firstBatch)
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         // Write second batch (should append)
-        _ <- ZStream.fromIterable(secondBatch).run(sink.make)
+        _ <- ZStream
+          .fromIterable(secondBatch)
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         // Read all records
         records <- ZIO.attemptBlocking {
@@ -370,6 +400,7 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
 
         ZStream
           .fromIterable(List(testTelemetry))
+          .groupedWithin(sink.desiredBatchSize, zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong))
           .run(sink.make)
           .flip
           .map(_.getMessage)
@@ -411,7 +442,13 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val writeAndVerify = for
         // Write all records in one batch
-        _ <- ZStream.fromIterable(testBatch).run(sink.make)
+        _ <- ZStream
+          .fromIterable(testBatch)
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         // Verify all records were written
         count <- ZIO.attemptBlocking {
@@ -437,7 +474,7 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
       assertZIO(writeAndVerify)(Assertion.equalTo(10))
     },
     test(
-      "DuckDBSensorValuesSink insertBatchDirect should insert multiple records"
+      "DuckDBSensorValuesSink should insert multiple records in a batch"
     ) {
       val tempFile = Files.createTempFile("ruuvi-test-direct-batch-", ".db")
       Files.deleteIfExists(tempFile)
@@ -488,8 +525,14 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         )
 
       val writeAndRead = for
-        // Insert batch directly
-        _ <- sink.insertBatchDirect(testBatch)
+        // Insert batch using the sink's make method with groupedWithin
+        _ <- ZStream
+          .fromIterable(testBatch)
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
 
         // Read all records
         records <- ZIO.attemptBlocking {
@@ -593,10 +636,7 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
             sink.desiredBatchSize,
             zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
           )
-          .mapZIO { batch =>
-            sink.insertBatchDirect(batch.toList)
-          }
-          .runDrain
+          .run(sink.make)
 
         // Verify all records were written
         count <- ZIO.attemptBlocking {

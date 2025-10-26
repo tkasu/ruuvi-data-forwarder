@@ -25,14 +25,12 @@ class DuckDBSensorValuesSink(
       yield ()
     }
 
-  def make: ZSink[Any, Throwable, RuuviTelemetry, Nothing, Unit] =
+  def make: ZSink[Any, Throwable, Chunk[RuuviTelemetry], Nothing, Unit] =
     ZSink.unwrap {
       // Initialize database and table once before processing any telemetry
       initializeDatabase.as {
-        // Process incoming data in chunks for efficient batch insertion
-        // Note: This processes chunks as they arrive; for time-based batching,
-        // use the batchingForwarder in App.scala which applies groupedWithin
-        ZSink.foreachChunk { (chunk: Chunk[RuuviTelemetry]) =>
+        // Process incoming chunks as batches for efficient insertion
+        ZSink.foreach { (chunk: Chunk[RuuviTelemetry]) =>
           val batch: List[RuuviTelemetry] = chunk.toList
           if batch.nonEmpty then
             for
@@ -55,30 +53,6 @@ class DuckDBSensorValuesSink(
         }
       }
     }
-
-  /** Public method for direct batch insertion with logging. Used by batching
-    * forwarder.
-    */
-  def insertBatchDirect(
-      telemetryBatch: List[RuuviTelemetry]
-  ): ZIO[Any, Throwable, Unit] =
-    if telemetryBatch.nonEmpty then
-      initializeDatabase *>
-        ZIO
-          .logDebug(
-            s"Writing batch of ${telemetryBatch.size} telemetry records to DuckDB (table: $tableName)"
-          )
-          .when(debugLogging) *>
-        ZIO.logInfo(
-          s"Inserting batch of ${telemetryBatch.size} records into DuckDB table $tableName"
-        ) *>
-        insertBatch(dbPath, tableName, telemetryBatch)
-          .tapError(err =>
-            ZIO.logError(
-              s"Failed to insert batch of ${telemetryBatch.size} records: ${err.getMessage}"
-            )
-          )
-    else ZIO.unit
 
   private def insertBatch(
       path: String,

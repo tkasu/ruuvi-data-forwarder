@@ -21,13 +21,16 @@ object App extends ZIOAppDefault:
 
   /** Creates a forwarder pipeline that reads from source and writes to sink.
     *
+    * Applies batching based on the sink's configuration (desiredBatchSize and
+    * desiredMaxBatchLatencySeconds) before piping to the sink.
+    *
     * Note: Uses ZIO logging - ensure logging backend is configured in the
     * Runtime (see `run` method for SLF4J backend configuration).
     *
     * @param sourceCreator
     *   Source that provides sensor telemetry stream
     * @param sinkCreator
-    *   Sink that consumes sensor telemetry
+    *   Sink that consumes sensor telemetry chunks
     * @return
     *   ZIO effect that runs forever, catching and logging parse errors
     */
@@ -37,36 +40,14 @@ object App extends ZIOAppDefault:
   ) =
     val source = sourceCreator.make
     val sink = sinkCreator.make
-    (source >>> sink).catchSome { case e: RuuviParseError =>
-      ZIO.logError(s"Error parsing telemetry: ${e.getMessage}")
-    }.forever
-
-  /** Creates a batching forwarder pipeline for DuckDB with groupedWithin
-    * support.
-    *
-    * @param sourceCreator
-    *   Source that provides sensor telemetry stream
-    * @param duckdbSink
-    *   DuckDB sink with batching configuration
-    * @return
-    *   ZIO effect that runs forever, catching and logging parse errors
-    */
-  def batchingForwarder(
-      sourceCreator: SensorValuesSource,
-      duckdbSink: DuckDBSensorValuesSink
-  ) =
-    val source = sourceCreator.make
     source
       .groupedWithin(
-        duckdbSink.desiredBatchSize,
+        sinkCreator.desiredBatchSize,
         zio.Duration.fromSeconds(
-          duckdbSink.desiredMaxBatchLatencySeconds.toLong
+          sinkCreator.desiredMaxBatchLatencySeconds.toLong
         )
       )
-      .mapZIO { batch =>
-        duckdbSink.insertBatchDirect(batch.toList)
-      }
-      .runDrain
+      .run(sink)
       .catchSome { case e: RuuviParseError =>
         ZIO.logError(s"Error parsing telemetry: ${e.getMessage}")
       }
@@ -144,33 +125,11 @@ object App extends ZIOAppDefault:
     appConfig <- ZIO.config(AppConfig.descriptor)
     _ <- ZIO.logInfo("Starting Ruuvi Data Forwarder")
     _ <- ZIO.logInfo("Reading from StdIn")
-    _ <- appConfig.sink.sinkType match
-      case SinkType.DuckDB =>
-        // Use batching forwarder for DuckDB with selectSink to avoid duplication
-        for
-          sink <- selectSink(appConfig.sink)
-          duckdbSink <- sink match
-            case s: DuckDBSensorValuesSink => ZIO.succeed(s)
-            case _ =>
-              ZIO.fail(
-                RuntimeException(
-                  "Expected DuckDB sink but got a different type"
-                )
-              )
-          _ <- batchingForwarder(ConsoleSensorValuesSource, duckdbSink)
-            .catchSome { case _: StreamShutdown =>
-              ZIO.logInfo("Stream completed - shutting down")
-            }
-        yield ()
-      case _ =>
-        // Use regular forwarder for other sinks
-        for
-          sink <- selectSink(appConfig.sink)
-          _ <- forwarder(ConsoleSensorValuesSource, sink)
-            .catchSome { case _: StreamShutdown =>
-              ZIO.logInfo("Stream completed - shutting down")
-            }
-        yield ()
+    sink <- selectSink(appConfig.sink)
+    _ <- forwarder(ConsoleSensorValuesSource, sink)
+      .catchSome { case _: StreamShutdown =>
+        ZIO.logInfo("Stream completed - shutting down")
+      }
   yield ()).provide(
     Runtime.removeDefaultLoggers >>> SLF4J.slf4j
   )
