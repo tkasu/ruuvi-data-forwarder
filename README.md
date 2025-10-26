@@ -306,7 +306,7 @@ ruuvi-reader-rs | RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.6.2/ruuvi-data
 # Data saved to: data/telemetry.db
 
 # Send to HTTP API
-ruuvi-reader-rs | RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com/v1 RUUVI_HTTP_SENSOR_NAME=outdoor-sensor java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+ruuvi-reader-rs | RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com RUUVI_HTTP_SENSOR_NAME=outdoor-sensor java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 #### From File
@@ -331,7 +331,7 @@ cat telemetry.jsonl | \
 # HTTP sink with custom API
 cat telemetry.jsonl | \
   RUUVI_SINK_TYPE=http \
-  RUUVI_HTTP_API_URL=http://api.example.com/v1 \
+  RUUVI_HTTP_API_URL=http://api.example.com \
   RUUVI_HTTP_SENSOR_NAME=my-sensor \
   java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
@@ -343,7 +343,7 @@ cat telemetry.jsonl | \
 ruuvi-reader-rs | tee \
   >(RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
   >(RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
-  >(RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com/v1 java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
+  >(RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
   >(java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar)
 ```
 
