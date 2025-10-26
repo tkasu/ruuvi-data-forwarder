@@ -10,7 +10,9 @@ import java.nio.file.{Files, Paths}
 class DuckDBSensorValuesSink(
     dbPath: String,
     tableName: String,
-    debugLogging: Boolean
+    debugLogging: Boolean,
+    val desiredBatchSize: Int,
+    val desiredMaxBatchLatencySeconds: Int
 ) extends SensorValuesSink:
 
   // Initialize database and table once when sink is created
@@ -23,32 +25,44 @@ class DuckDBSensorValuesSink(
       yield ()
     }
 
-  def make: ZSink[Any, Throwable, RuuviTelemetry, Nothing, Unit] =
+  def make: ZSink[Any, Throwable, Chunk[RuuviTelemetry], Nothing, Unit] =
     ZSink.unwrap {
       // Initialize database and table once before processing any telemetry
       initializeDatabase.as {
-        ZSink.foreach { telemetry =>
-          for
-            _ <- ZIO
-              .logDebug(
-                s"Writing telemetry to DuckDB (table: $tableName): ${telemetry.macAddress.mkString(",")}"
+        // Process incoming chunks as batches for efficient insertion
+        ZSink.foreach { (chunk: Chunk[RuuviTelemetry]) =>
+          val batch: List[RuuviTelemetry] = chunk.toList
+          if batch.nonEmpty then
+            for
+              _ <- ZIO
+                .logDebug(
+                  s"Processing chunk of ${batch.size} telemetry records for DuckDB (table: $tableName)"
+                )
+                .when(debugLogging)
+              _ <- ZIO.logInfo(
+                s"Inserting batch of ${batch.size} records into DuckDB table $tableName"
               )
-              .when(debugLogging)
-            _ <- insertTelemetry(dbPath, tableName, telemetry)
-          yield ()
+              _ <- insertBatch(dbPath, tableName, batch)
+                .tapError(err =>
+                  ZIO.logError(
+                    s"Failed to insert batch of ${batch.size} records: ${err.getMessage}"
+                  )
+                )
+            yield ()
+          else ZIO.unit
         }
       }
     }
 
-  private def insertTelemetry(
+  private def insertBatch(
       path: String,
       table: String,
-      telemetry: RuuviTelemetry
+      telemetryBatch: List[RuuviTelemetry]
   ): ZIO[Any, Throwable, Unit] =
     ZIO.scoped {
       for
         conn <- acquireConnection(path)
-        _ <- insertRecord(conn, table, telemetry)
+        _ <- insertRecordsBatch(conn, table, telemetryBatch)
       yield ()
     }
 
@@ -107,10 +121,10 @@ class DuckDBSensorValuesSink(
         )
     }
 
-  private def insertRecord(
+  private def insertRecordsBatch(
       conn: Connection,
       table: String,
-      telemetry: RuuviTelemetry
+      telemetryBatch: List[RuuviTelemetry]
   ): ZIO[Any, Throwable, Unit] =
     ZIO.attemptBlocking {
       val insertSQL = s"""
@@ -128,19 +142,22 @@ class DuckDBSensorValuesSink(
       """
       val pstmt = conn.prepareStatement(insertSQL)
       try
-        pstmt.setInt(1, telemetry.temperatureMillicelsius)
-        pstmt.setInt(2, telemetry.humidity)
-        pstmt.setInt(3, telemetry.pressure)
-        pstmt.setInt(4, telemetry.batteryPotential)
-        pstmt.setInt(5, telemetry.txPower)
-        pstmt.setInt(6, telemetry.movementCounter)
-        pstmt.setInt(7, telemetry.measurementSequenceNumber)
-        pstmt.setLong(8, telemetry.measurementTsMs)
-        // Store MAC address in standard format (e.g., "FE:26:88:7A:66:66")
-        val macAddress = telemetry.macAddress
-          .map(b => f"${b & 0xff}%02X")
-          .mkString(":")
-        pstmt.setString(9, macAddress)
-        pstmt.executeUpdate()
+        telemetryBatch.foreach { telemetry =>
+          pstmt.setInt(1, telemetry.temperatureMillicelsius)
+          pstmt.setInt(2, telemetry.humidity)
+          pstmt.setInt(3, telemetry.pressure)
+          pstmt.setInt(4, telemetry.batteryPotential)
+          pstmt.setInt(5, telemetry.txPower)
+          pstmt.setInt(6, telemetry.movementCounter)
+          pstmt.setInt(7, telemetry.measurementSequenceNumber)
+          pstmt.setLong(8, telemetry.measurementTsMs)
+          // Store MAC address in standard format (e.g., "FE:26:88:7A:66:66")
+          val macAddress = telemetry.macAddress
+            .map(b => f"${b & 0xff}%02X")
+            .mkString(":")
+          pstmt.setString(9, macAddress)
+          pstmt.addBatch()
+        }
+        pstmt.executeBatch()
       finally pstmt.close()
     }

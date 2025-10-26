@@ -36,7 +36,11 @@ case class DuckDBConfig(
     @name("table-name")
     tableName: String,
     @name("debug-logging")
-    debugLogging: Boolean
+    debugLogging: Boolean,
+    @name("desired-batch-size")
+    desiredBatchSize: Int,
+    @name("desired-max-batch-latency-seconds")
+    desiredMaxBatchLatencySeconds: Int
 )
 
 object DuckDBConfig:

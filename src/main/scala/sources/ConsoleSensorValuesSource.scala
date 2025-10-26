@@ -7,12 +7,15 @@ import zio.stream.*
 
 object ConsoleSensorValuesSource extends SensorValuesSource:
   def make: ZStream[Any, SourceError, RuuviTelemetry] =
-    val consoleParser = for
-      inputString <- Console.readLine.catchNonFatalOrDie {
-        case _: java.io.EOFException => ZIO.fail(StreamShutdown())
+    val consoleParser: ZIO[Any, Option[SourceError], RuuviTelemetry] = (for
+      inputString <- Console.readLine.mapError {
+        case _: java.io.EOFException => None
+        case other => Some(RuuviParseError(other.getMessage, other))
       }
       maybeJson = inputString.fromJson[RuuviTelemetry]
-      json <- ZIO.fromEither(maybeJson).mapError(err => RuuviParseError(err))
-    yield json
+      json <- ZIO
+        .fromEither(maybeJson)
+        .mapError(err => Some(RuuviParseError(err)): Option[SourceError])
+    yield json)
 
-    ZStream.fromZIO(consoleParser)
+    ZStream.repeatZIOOption(consoleParser)

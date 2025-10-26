@@ -8,23 +8,30 @@ import zio.logging.*
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.nio.charset.StandardCharsets
 
-class JsonLinesSensorValuesSink(filePath: String, debugLogging: Boolean)
-    extends SensorValuesSink:
+class JsonLinesSensorValuesSink(
+    filePath: String,
+    debugLogging: Boolean
+) extends SensorValuesSink:
 
-  def make: ZSink[Any, java.io.IOException, RuuviTelemetry, Nothing, Unit] =
+  // JSON Lines sink processes one record at a time (batch size of 1)
+  val desiredBatchSize: Int = 1
+  // Very long wait time for JSON Lines sink (24 hours in seconds)
+  val desiredMaxBatchLatencySeconds: Int = 86400
+
+  def make
+      : ZSink[Any, java.io.IOException, Chunk[RuuviTelemetry], Nothing, Unit] =
     // Note: Sequential processing is suitable for typical sensor telemetry rates.
-    // For high-throughput scenarios, consider ZSink.foreachChunk (batched writes)
-    // or ZSink.foreachParN (parallel writes) to improve performance.
-    ZSink.foreach { telemetry =>
-      for
-        json <- ZIO.succeed(telemetry.toJson)
-        _ <- ZIO
-          .logDebug(s"Writing telemetry to $filePath: $json")
-          .when(
-            debugLogging
-          )
-        _ <- writeJsonLine(filePath, json)
-      yield ()
+    // For high-throughput scenarios, consider batched writes to improve performance.
+    ZSink.foreach { chunk =>
+      ZIO.foreachDiscard(chunk) { telemetry =>
+        for
+          json <- ZIO.succeed(telemetry.toJson)
+          _ <- ZIO
+            .logDebug(s"Writing telemetry to $filePath: $json")
+            .when(debugLogging)
+          _ <- writeJsonLine(filePath, json)
+        yield ()
+      }
     }
 
   private def writeJsonLine(

@@ -22,15 +22,19 @@ object App extends ZIOAppDefault:
 
   /** Creates a forwarder pipeline that reads from source and writes to sink.
     *
+    * Applies batching based on the sink's configuration (desiredBatchSize and
+    * desiredMaxBatchLatencySeconds) before piping to the sink.
+    *
     * Note: Uses ZIO logging - ensure logging backend is configured in the
     * Runtime (see `run` method for SLF4J backend configuration).
     *
     * @param sourceCreator
     *   Source that provides sensor telemetry stream
     * @param sinkCreator
-    *   Sink that consumes sensor telemetry
+    *   Sink that consumes sensor telemetry chunks
     * @return
-    *   ZIO effect that runs forever, catching and logging parse errors
+    *   ZIO effect that runs until the source stream completes, catching and
+    *   logging parse errors
     */
   def forwarder(
       sourceCreator: SensorValuesSource,
@@ -38,9 +42,17 @@ object App extends ZIOAppDefault:
   ) =
     val source = sourceCreator.make
     val sink = sinkCreator.make
-    (source >>> sink).catchSome { case e: RuuviParseError =>
-      ZIO.logError(s"Error parsing telemetry: ${e.getMessage}")
-    }.forever
+    source
+      .groupedWithin(
+        sinkCreator.desiredBatchSize,
+        zio.Duration.fromSeconds(
+          sinkCreator.desiredMaxBatchLatencySeconds.toLong
+        )
+      )
+      .run(sink)
+      .catchSome { case e: RuuviParseError =>
+        ZIO.logError(s"Error parsing telemetry: ${e.getMessage}")
+      }
 
   /** Selects and initializes the appropriate sink based on configuration.
     *
@@ -88,11 +100,19 @@ object App extends ZIOAppDefault:
               ZIO.logInfo(
                 s"Debug logging enabled: ${duckdbConfig.debugLogging}"
               ) *>
+              ZIO.logInfo(
+                s"Batch size: ${duckdbConfig.desiredBatchSize}"
+              ) *>
+              ZIO.logInfo(
+                s"Batch latency: ${duckdbConfig.desiredMaxBatchLatencySeconds}s"
+              ) *>
               ZIO.succeed(
                 DuckDBSensorValuesSink(
                   duckdbConfig.path,
                   duckdbConfig.tableName,
-                  duckdbConfig.debugLogging
+                  duckdbConfig.debugLogging,
+                  duckdbConfig.desiredBatchSize,
+                  duckdbConfig.desiredMaxBatchLatencySeconds
                 )
               )
           case None =>
