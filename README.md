@@ -144,7 +144,7 @@ Sends telemetry data to a ruuvitag-api compatible HTTP endpoint. Each RuuviTelem
 ```shell
 # Set via environment variables
 export RUUVI_SINK_TYPE=http
-export RUUVI_HTTP_API_URL=http://localhost:8080/v1  # Optional, default shown
+export RUUVI_HTTP_API_URL=http://localhost:8081  # Optional, default shown
 export RUUVI_HTTP_SENSOR_NAME=default-sensor        # Optional, default shown
 export RUUVI_HTTP_DEBUG_LOGGING=true                # Optional, default shown
 export RUUVI_HTTP_TIMEOUT_SECONDS=30                # Optional, default shown
@@ -156,7 +156,7 @@ java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 Or inline:
 ```shell
-RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://localhost:8080/v1 RUUVI_HTTP_SENSOR_NAME=my-sensor java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://localhost:8081 RUUVI_HTTP_SENSOR_NAME=my-sensor java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 **API Format:**
@@ -210,7 +210,7 @@ sink {
     }
 
     http {
-      api-url = "http://localhost:8080/v1"  # ruuvitag-api base URL
+      api-url = "http://localhost:8081"  # ruuvitag-api base URL
       sensor-name = "default-sensor"        # Sensor name for API requests
       debug-logging = true                  # Log each HTTP request to debug level
       timeout-seconds = 30                  # HTTP request timeout in seconds

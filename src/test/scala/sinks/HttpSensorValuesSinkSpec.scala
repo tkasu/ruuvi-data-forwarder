@@ -25,7 +25,7 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
       )
 
       val sink = HttpSensorValuesSink(
-        "http://localhost:8080/v1",
+        "http://localhost:8081",
         "test-sensor",
         debugLogging = false,
         timeoutSeconds = 30,
@@ -61,7 +61,7 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
       )
 
       val sink = HttpSensorValuesSink(
-        "http://localhost:8080/v1",
+        "http://localhost:8081",
         "test-sensor",
         debugLogging = false
       )
@@ -89,7 +89,7 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
       )
 
       val sink = HttpSensorValuesSink(
-        "http://localhost:8080/v1",
+        "http://localhost:8081",
         "test-sensor",
         debugLogging = false
       )
@@ -115,7 +115,7 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
       )
 
       val sink = HttpSensorValuesSink(
-        "http://localhost:8080/v1",
+        "http://localhost:8081",
         "test-sensor",
         debugLogging = false
       )
@@ -141,7 +141,7 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
       )
 
       val sink = HttpSensorValuesSink(
-        "http://localhost:8080/v1",
+        "http://localhost:8081",
         "test-sensor",
         debugLogging = false
       )
@@ -172,7 +172,7 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
       )
 
       val sink = HttpSensorValuesSink(
-        "http://localhost:8080/v1",
+        "http://localhost:8081",
         "test-sensor",
         debugLogging = false
       )
