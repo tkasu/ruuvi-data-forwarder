@@ -47,7 +47,9 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         DuckDBSensorValuesSink(
           tempFile.toString,
           "test_telemetry",
-          debugLogging = false
+          debugLogging = false,
+          desiredBatchSize = 5,
+          desiredMaxBatchLatencySeconds = 30
         )
 
       val writeAndRead = for
@@ -117,7 +119,9 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         DuckDBSensorValuesSink(
           tempFile.toString,
           "telemetry",
-          debugLogging = false
+          debugLogging = false,
+          desiredBatchSize = 5,
+          desiredMaxBatchLatencySeconds = 30
         )
 
       val writeAndVerify = for
@@ -188,7 +192,9 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         DuckDBSensorValuesSink(
           nestedPath.toString,
           "telemetry",
-          debugLogging = false
+          debugLogging = false,
+          desiredBatchSize = 5,
+          desiredMaxBatchLatencySeconds = 30
         )
 
       val writeAndVerify = for
@@ -276,7 +282,9 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         DuckDBSensorValuesSink(
           tempFile.toString,
           "telemetry",
-          debugLogging = false
+          debugLogging = false,
+          desiredBatchSize = 5,
+          desiredMaxBatchLatencySeconds = 30
         )
 
       val writeAndRead = for
@@ -355,7 +363,9 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         val sink = DuckDBSensorValuesSink(
           ":memory:",
           invalidName,
-          debugLogging = false
+          debugLogging = false,
+          desiredBatchSize = 5,
+          desiredMaxBatchLatencySeconds = 30
         )
 
         ZStream
