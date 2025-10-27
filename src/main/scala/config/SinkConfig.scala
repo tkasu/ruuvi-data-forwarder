@@ -81,8 +81,6 @@ object DuckDBConfig:
 case class HttpConfig(
     @name("api-url")
     apiUrl: String,
-    @name("sensor-name")
-    sensorName: String,
     @name("debug-logging")
     debugLogging: Boolean,
     @name("timeout-seconds")

@@ -147,7 +147,6 @@ object App extends ZIOAppDefault:
         sinkConfig.http match
           case Some(httpConfig) =>
             ZIO.logInfo(s"Using HTTP sink: ${httpConfig.apiUrl}") *>
-              ZIO.logInfo(s"Sensor name: ${httpConfig.sensorName}") *>
               ZIO.logInfo(
                 s"Debug logging enabled: ${httpConfig.debugLogging}"
               ) *>
@@ -157,7 +156,6 @@ object App extends ZIOAppDefault:
               ZIO.succeed(
                 HttpSensorValuesSink(
                   httpConfig.apiUrl,
-                  httpConfig.sensorName,
                   httpConfig.debugLogging,
                   httpConfig.timeoutSeconds,
                   httpConfig.maxRetries

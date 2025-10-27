@@ -26,7 +26,6 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val sink = HttpSensorValuesSink(
         "http://localhost:8081",
-        "test-sensor",
         debugLogging = false,
         timeoutSeconds = 30,
         maxRetries = 3
@@ -62,7 +61,6 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val sink = HttpSensorValuesSink(
         "http://localhost:8081",
-        "test-sensor",
         debugLogging = false
       )
 
@@ -72,7 +70,7 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
 
       assertTrue(measurement.isDefined) &&
       assertTrue(measurement.get.value == -29.02) &&
-      assertTrue(measurement.get.sensor_name == "FE:26:88:7A:66:66") &&
+      assertTrue(measurement.get.mac_address == "FE:26:88:7A:66:66") &&
       assertTrue(measurement.get.timestamp == 1693460525699L)
     },
     test("should convert humidity with correct value") {
@@ -90,7 +88,6 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val sink = HttpSensorValuesSink(
         "http://localhost:8081",
-        "test-sensor",
         debugLogging = false
       )
 
@@ -116,7 +113,6 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val sink = HttpSensorValuesSink(
         "http://localhost:8081",
-        "test-sensor",
         debugLogging = false
       )
 
@@ -142,7 +138,6 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val sink = HttpSensorValuesSink(
         "http://localhost:8081",
-        "test-sensor",
         debugLogging = false
       )
 
@@ -158,7 +153,7 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
         )
       )
     },
-    test("should handle all measurement types with correct sensor_name") {
+    test("should handle all measurement types with correct mac_address") {
       val testTelemetry = RuuviTelemetry(
         batteryPotential = 2176,
         humidity = 576425,
@@ -173,14 +168,13 @@ object HttpSensorValuesSinkSpec extends ZIOSpecDefault:
 
       val sink = HttpSensorValuesSink(
         "http://localhost:8081",
-        "test-sensor",
         debugLogging = false
       )
 
       val result = sink.convertToApiFormat(testTelemetry)
 
       // All measurements should have the same MAC address
-      val allMacAddresses = result.flatMap(_.data.map(_.sensor_name)).distinct
+      val allMacAddresses = result.flatMap(_.data.map(_.mac_address)).distinct
 
       assertTrue(allMacAddresses.length == 1) &&
       assertTrue(allMacAddresses.head == "D5:12:34:66:14:14")
