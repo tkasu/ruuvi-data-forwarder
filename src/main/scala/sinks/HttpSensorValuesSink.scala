@@ -6,12 +6,10 @@ import zio.http.*
 import zio.json.*
 import zio.stream.*
 import zio.logging.*
-import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 class HttpSensorValuesSink(
     apiUrl: String,
-    sensorName: String,
     debugLogging: Boolean,
     timeoutSeconds: Int = 30,
     maxRetries: Int = 3,
@@ -21,7 +19,7 @@ class HttpSensorValuesSink(
 
   // Data models for the ruuvitag-api request format
   case class Measurement(
-      sensor_name: String,
+      mac_address: String,
       timestamp: Long,
       value: Double
   )
@@ -68,12 +66,8 @@ class HttpSensorValuesSink(
       _ <- ZIO
         .logDebug(s"Request payload: $json")
         .when(debugLogging)
-      // URL encode sensor name and construct URL properly
-      encodedSensorName = URLEncoder.encode(
-        sensorName,
-        StandardCharsets.UTF_8.name()
-      )
-      url = s"${apiUrl.stripSuffix("/")}/telemetry/$encodedSensorName"
+      // Construct URL for POST /telemetry endpoint
+      url = s"${apiUrl.stripSuffix("/")}/telemetry"
       // Prepare body with proper headers
       bodyBytes = json.getBytes(StandardCharsets.UTF_8)
       maybeResponse <- Client
@@ -142,7 +136,7 @@ class HttpSensorValuesSink(
         telemetry_type = "temperature",
         data = List(
           Measurement(
-            sensor_name = macAddress,
+            mac_address = macAddress,
             timestamp = timestamp,
             value = telemetry.temperatureMillicelsius / 1000.0
           )
@@ -152,7 +146,7 @@ class HttpSensorValuesSink(
         telemetry_type = "humidity",
         data = List(
           Measurement(
-            sensor_name = macAddress,
+            mac_address = macAddress,
             timestamp = timestamp,
             value = telemetry.humidity / 10000.0
           )
@@ -162,7 +156,7 @@ class HttpSensorValuesSink(
         telemetry_type = "pressure",
         data = List(
           Measurement(
-            sensor_name = macAddress,
+            mac_address = macAddress,
             timestamp = timestamp,
             value = telemetry.pressure.toDouble
           )
@@ -172,7 +166,7 @@ class HttpSensorValuesSink(
         telemetry_type = "battery",
         data = List(
           Measurement(
-            sensor_name = macAddress,
+            mac_address = macAddress,
             timestamp = timestamp,
             value = telemetry.batteryPotential / 1000.0
           )
@@ -182,7 +176,7 @@ class HttpSensorValuesSink(
         telemetry_type = "tx_power",
         data = List(
           Measurement(
-            sensor_name = macAddress,
+            mac_address = macAddress,
             timestamp = timestamp,
             value = telemetry.txPower.toDouble
           )
@@ -192,7 +186,7 @@ class HttpSensorValuesSink(
         telemetry_type = "movement_counter",
         data = List(
           Measurement(
-            sensor_name = macAddress,
+            mac_address = macAddress,
             timestamp = timestamp,
             value = telemetry.movementCounter.toDouble
           )
@@ -202,7 +196,7 @@ class HttpSensorValuesSink(
         telemetry_type = "measurement_sequence_number",
         data = List(
           Measurement(
-            sensor_name = macAddress,
+            mac_address = macAddress,
             timestamp = timestamp,
             value = telemetry.measurementSequenceNumber.toDouble
           )
