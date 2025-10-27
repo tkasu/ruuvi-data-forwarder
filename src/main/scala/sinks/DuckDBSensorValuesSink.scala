@@ -151,7 +151,8 @@ class DuckDBSensorValuesSink(
       _ <- validateTableName(table)
       _ <- ZIO.attemptBlocking {
         // Use ducklake. prefix when in DuckLake mode
-        val fullTableName = if ducklakeEnabled then s"ducklake.$table" else table
+        val fullTableName =
+          if ducklakeEnabled then s"ducklake.$table" else table
         val createTableSQL = s"""
         CREATE TABLE IF NOT EXISTS $fullTableName (
           temperature_millicelsius INTEGER NOT NULL,

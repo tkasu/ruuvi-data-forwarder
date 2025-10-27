@@ -668,7 +668,8 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
     test(
       "DuckDBSensorValuesSink with DuckLake (DuckDB catalog) should write telemetry"
     ) {
-      val tempCatalog = Files.createTempFile("ruuvi-test-ducklake-catalog-", ".ducklake")
+      val tempCatalog =
+        Files.createTempFile("ruuvi-test-ducklake-catalog-", ".ducklake")
       val tempDataDir = Files.createTempDirectory("ruuvi-test-ducklake-data-")
       Files.deleteIfExists(tempCatalog)
 
@@ -738,7 +739,8 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
             batteryPotential = rs.getInt("battery_potential"),
             txPower = rs.getInt("tx_power"),
             movementCounter = rs.getInt("movement_counter"),
-            measurementSequenceNumber = rs.getInt("measurement_sequence_number"),
+            measurementSequenceNumber =
+              rs.getInt("measurement_sequence_number"),
             measurementTsMs = rs.getLong("measurement_ts_ms"),
             macAddress = rs
               .getString("mac_address")
@@ -769,8 +771,10 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
     test(
       "DuckDBSensorValuesSink with DuckLake should append to existing data"
     ) {
-      val tempCatalog = Files.createTempFile("ruuvi-test-ducklake-append-catalog-", ".ducklake")
-      val tempDataDir = Files.createTempDirectory("ruuvi-test-ducklake-append-data-")
+      val tempCatalog =
+        Files.createTempFile("ruuvi-test-ducklake-append-catalog-", ".ducklake")
+      val tempDataDir =
+        Files.createTempDirectory("ruuvi-test-ducklake-append-data-")
       Files.deleteIfExists(tempCatalog)
 
       val firstTelemetry = RuuviTelemetry(
@@ -849,7 +853,9 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
           attachStmt.close()
 
           val stmt = conn.createStatement()
-          val rs = stmt.executeQuery("SELECT COUNT(*) as count FROM ducklake.telemetry")
+          val rs = stmt.executeQuery(
+            "SELECT COUNT(*) as count FROM ducklake.telemetry"
+          )
 
           rs.next()
           val result = rs.getInt("count")
