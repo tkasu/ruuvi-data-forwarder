@@ -1,4 +1,4 @@
-.PHONY: help build build-assembly test lint format clean run console create-test-data test-console-sink test-jsonlines-sink test-duckdb-sink test-sinks
+.PHONY: help build build-assembly test lint format clean run console create-test-data test-console-sink test-jsonlines-sink test-duckdb-sink test-ducklake-sink test-sinks clean-data clean-test-data clean-ducklake-data
 
 ASSEMBLY_JAR := $(shell ls -t target/scala-*/ruuvi-data-forwarder-assembly-*.jar 2>/dev/null | head -n 1)
 TEST_DATA := test-data.jsonl
@@ -17,11 +17,17 @@ help:
 	@echo "  make console         - Start SBT console"
 	@echo ""
 	@echo "Integration Testing:"
-	@echo "  make create-test-data    - Create test data file for integration tests"
-	@echo "  make test-console-sink   - Test Console sink (stdout)"
-	@echo "  make test-jsonlines-sink - Test JSON Lines sink (file output)"
-	@echo "  make test-duckdb-sink    - Test DuckDB sink (database output)"
-	@echo "  make test-sinks          - Test all sink types"
+	@echo "  make create-test-data       - Create test data file for integration tests"
+	@echo "  make test-console-sink      - Test Console sink (stdout)"
+	@echo "  make test-jsonlines-sink    - Test JSON Lines sink (file output)"
+	@echo "  make test-duckdb-sink       - Test DuckDB sink (database output)"
+	@echo "  make test-ducklake-sink     - Test DuckLake sink (lakehouse output)"
+	@echo "  make test-sinks             - Test all sink types"
+	@echo ""
+	@echo "Data Management:"
+	@echo "  make clean-data             - Remove all data files (DB, JSON, DuckLake)"
+	@echo "  make clean-test-data        - Remove integration test data only"
+	@echo "  make clean-ducklake-data    - Remove DuckLake catalog and data files"
 
 build:
 	sbt compile
@@ -121,8 +127,74 @@ test-duckdb-sink: check-assembly create-test-data
 		exit 1 ; \
 	fi
 
-test-sinks: test-console-sink test-jsonlines-sink test-duckdb-sink
+test-ducklake-sink: check-assembly create-test-data
+	@echo "Testing DuckLake sink with SQLite catalog..."
+	@echo "Cleaning up old test data..."
+	@rm -rf data/test_catalog.sqlite data/test_ducklake_files/
+	@mkdir -p data/test_ducklake_files/
+	@echo "Writing test data to DuckLake (catalog: data/test_catalog.sqlite, files: data/test_ducklake_files/)..."
+	@(cat $(TEST_DATA) | \
+		RUUVI_SINK_TYPE=duckdb \
+		RUUVI_DUCKDB_DUCKLAKE_ENABLED=true \
+		RUUVI_DUCKDB_DUCKLAKE_CATALOG_TYPE=sqlite \
+		RUUVI_DUCKDB_DUCKLAKE_CATALOG_PATH=data/test_catalog.sqlite \
+		RUUVI_DUCKDB_DUCKLAKE_DATA_PATH=data/test_ducklake_files/ \
+		java -jar $(ASSEMBLY_JAR) > /dev/null 2>&1 &) ; \
+		PID=$$! ; \
+		TIMEOUT=50 ; \
+		WAITED=0 ; \
+		while [ ! -f data/test_catalog.sqlite ] && [ $$WAITED -lt $$TIMEOUT ]; do \
+			sleep 0.2 ; \
+			WAITED=$$(($$WAITED + 1)) ; \
+		done ; \
+		sleep 0.5 ; \
+		kill $$PID 2>/dev/null || true ; \
+		wait $$PID 2>/dev/null || true ; \
+		sleep 0.5
+	@if [ -f data/test_catalog.sqlite ]; then \
+		echo "✓ Catalog created: data/test_catalog.sqlite" ; \
+		if [ -d data/test_ducklake_files ]; then \
+			echo "✓ Data directory created: data/test_ducklake_files/" ; \
+			echo "Verifying data with DuckDB client..." ; \
+			ROW_COUNT=$$(duckdb :memory: -c "INSTALL ducklake; LOAD ducklake; ATTACH 'ducklake:sqlite:data/test_catalog.sqlite' AS my_ducklake (DATA_PATH 'data/test_ducklake_files/'); SELECT COUNT(*) FROM my_ducklake.telemetry;" | grep -E '^│[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | head -1) ; \
+			if [ "$$ROW_COUNT" = "2" ]; then \
+				echo "✓ Data verified: $$ROW_COUNT rows found in telemetry table" ; \
+			else \
+				echo "✗ Expected 2 rows, but found: $$ROW_COUNT" ; \
+				exit 1 ; \
+			fi ; \
+		else \
+			echo "✗ Data directory not created" ; \
+			exit 1 ; \
+		fi ; \
+	else \
+		echo "✗ Catalog not created" ; \
+		exit 1 ; \
+	fi
+
+test-sinks: test-console-sink test-jsonlines-sink test-duckdb-sink test-ducklake-sink
 	@echo ""
 	@echo "====================================="
 	@echo "✓ All sink tests passed successfully"
 	@echo "====================================="
+
+# Data cleanup commands
+clean-data:
+	@echo "Cleaning all data files..."
+	@rm -f data/telemetry.db data/telemetry.jsonl data/catalog.sqlite
+	@rm -rf data/ducklake_files/
+	@rm -f data/test_catalog.sqlite
+	@rm -rf data/test_ducklake_files/
+	@echo "✓ All data files removed"
+
+clean-test-data:
+	@echo "Cleaning integration test data..."
+	@rm -f data/test_catalog.sqlite
+	@rm -rf data/test_ducklake_files/
+	@echo "✓ Integration test data removed"
+
+clean-ducklake-data:
+	@echo "Cleaning DuckLake catalog and data files..."
+	@rm -f data/catalog.sqlite
+	@rm -rf data/ducklake_files/
+	@echo "✓ DuckLake data removed"

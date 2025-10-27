@@ -1,6 +1,7 @@
 package sinks
 
 import dto.RuuviTelemetry
+import config.{DuckLakeConfig, CatalogType}
 import zio.*
 import zio.stream.*
 import zio.logging.*
@@ -12,7 +13,9 @@ class DuckDBSensorValuesSink(
     tableName: String,
     debugLogging: Boolean,
     val desiredBatchSize: Int,
-    val desiredMaxBatchLatencySeconds: Int
+    val desiredMaxBatchLatencySeconds: Int,
+    ducklakeEnabled: Boolean = false,
+    ducklakeConfig: Option[DuckLakeConfig] = None
 ) extends SensorValuesSink:
 
   // Initialize database and table once when sink is created
@@ -71,17 +74,72 @@ class DuckDBSensorValuesSink(
   ): ZIO[Scope, Throwable, Connection] =
     ZIO.acquireRelease(
       ZIO.attemptBlocking {
-        // Create parent directories if needed (for file-based databases)
-        if path != ":memory:" then
-          val dbFilePath = Paths.get(path)
-          Option(dbFilePath.getParent).foreach(Files.createDirectories(_))
-
         // Load DuckDB JDBC driver
         Class.forName("org.duckdb.DuckDBDriver")
-        // Connect to DuckDB (file-based or in-memory)
-        val jdbcUrl =
-          if path == ":memory:" then "jdbc:duckdb:" else s"jdbc:duckdb:$path"
-        DriverManager.getConnection(jdbcUrl)
+
+        if ducklakeEnabled then
+          // DuckLake mode: connect via DuckLake extension
+          ducklakeConfig match
+            case Some(config) =>
+              // Create parent directories for catalog and data paths
+              val catalogFilePath = Paths.get(config.catalogPath)
+              Option(catalogFilePath.getParent)
+                .foreach(Files.createDirectories(_))
+
+              val dataFilePath = Paths.get(config.dataPath)
+              Files.createDirectories(dataFilePath)
+
+              // Create a regular DuckDB connection first
+              val conn = DriverManager.getConnection("jdbc:duckdb:")
+
+              // Install necessary extensions
+              val installStmt = conn.createStatement()
+              try
+                installStmt.execute("INSTALL ducklake")
+                installStmt.execute("LOAD ducklake")
+
+                // Install SQLite extension if needed
+                config.catalogType match
+                  case CatalogType.SQLite =>
+                    installStmt.execute("INSTALL sqlite")
+                    installStmt.execute("LOAD sqlite")
+                  case CatalogType.Postgres =>
+                    installStmt.execute("INSTALL postgres")
+                    installStmt.execute("LOAD postgres")
+                  case CatalogType.DuckDB =>
+                  // No additional extension needed
+              finally installStmt.close()
+
+              // Attach DuckLake database with alias "ducklake"
+              val attachSQL = config.catalogType match
+                case CatalogType.DuckDB =>
+                  s"ATTACH 'ducklake:${config.catalogPath}' AS ducklake (DATA_PATH '${config.dataPath}')"
+                case CatalogType.SQLite =>
+                  s"ATTACH 'ducklake:sqlite:${config.catalogPath}' AS ducklake (DATA_PATH '${config.dataPath}')"
+                case CatalogType.Postgres =>
+                  s"ATTACH 'ducklake:${config.catalogPath}' AS ducklake (DATA_PATH '${config.dataPath}')"
+
+              val attachStmt = conn.createStatement()
+              try attachStmt.execute(attachSQL)
+              finally attachStmt.close()
+
+              conn
+
+            case None =>
+              throw new IllegalStateException(
+                "DuckLake enabled but configuration is missing"
+              )
+        else
+          // Standard DuckDB mode (original behavior)
+          // Create parent directories if needed (for file-based databases)
+          if path != ":memory:" then
+            val dbFilePath = Paths.get(path)
+            Option(dbFilePath.getParent).foreach(Files.createDirectories(_))
+
+          // Connect to DuckDB (file-based or in-memory)
+          val jdbcUrl =
+            if path == ":memory:" then "jdbc:duckdb:" else s"jdbc:duckdb:$path"
+          DriverManager.getConnection(jdbcUrl)
       }
     )(conn => ZIO.attemptBlocking(conn.close()).orDie)
 
@@ -92,8 +150,11 @@ class DuckDBSensorValuesSink(
     for
       _ <- validateTableName(table)
       _ <- ZIO.attemptBlocking {
+        // Use ducklake. prefix when in DuckLake mode
+        val fullTableName =
+          if ducklakeEnabled then s"ducklake.$table" else table
         val createTableSQL = s"""
-        CREATE TABLE IF NOT EXISTS $table (
+        CREATE TABLE IF NOT EXISTS $fullTableName (
           temperature_millicelsius INTEGER NOT NULL,
           humidity INTEGER NOT NULL,
           pressure INTEGER NOT NULL,
@@ -127,8 +188,10 @@ class DuckDBSensorValuesSink(
       telemetryBatch: List[RuuviTelemetry]
   ): ZIO[Any, Throwable, Unit] =
     ZIO.attemptBlocking {
+      // Use ducklake. prefix when in DuckLake mode
+      val fullTableName = if ducklakeEnabled then s"ducklake.$table" else table
       val insertSQL = s"""
-        INSERT INTO $table (
+        INSERT INTO $fullTableName (
           temperature_millicelsius,
           humidity,
           pressure,
