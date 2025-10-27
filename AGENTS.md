@@ -6,7 +6,7 @@
 
 **Status:** Active Development
 
-**Language:** Scala 3.6.2
+**Language:** Scala 3.7.3
 
 **Framework:** ZIO 2.1.14 (Functional Effect System)
 
