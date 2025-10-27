@@ -6,7 +6,7 @@
 
 **Status:** Active Development
 
-**Language:** Scala 3.6.2
+**Language:** Scala 3.7.3
 
 **Framework:** ZIO 2.1.14 (Functional Effect System)
 
@@ -432,10 +432,6 @@ Key dependencies from build.sbt:
 - Verify input JSON matches expected schema
 - Check for invalid UTF-8 or malformed JSON
 - Look for errors logged to stderr
-
-**Issue: OutOfMemoryError with large streams**
-- Increase JVM heap: `java -Xmx2G -jar forwarder.jar`
-- ZIO Streams should handle backpressure automatically
 
 **Issue: Tests fail on formatting**
 ```bash

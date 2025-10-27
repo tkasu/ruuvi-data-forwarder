@@ -25,7 +25,7 @@ A Scala 3 + ZIO-based middleware for processing and forwarding Ruuvi Tag sensor 
 make build-assembly
 
 # Test with sample data (Console sink)
-echo '{"battery_potential":2335,"humidity":653675,"measurement_ts_ms":1693460525701,"mac_address":[254,38,136,122,102,102],"measurement_sequence_number":53300,"movement_counter":2,"pressure":100755,"temperature_millicelsius":-29020,"tx_power":4}' | java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+echo '{"battery_potential":2335,"humidity":653675,"measurement_ts_ms":1693460525701,"mac_address":[254,38,136,122,102,102],"measurement_sequence_number":53300,"movement_counter":2,"pressure":100755,"temperature_millicelsius":-29020,"tx_power":4}' | java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # Test JSON Lines sink
 make test-jsonlines-sink
@@ -45,7 +45,7 @@ Writes JSON to stdout. Useful for piping to other tools or for debugging.
 make run
 
 # Or directly
-java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 #### 2. JSON Lines Sink
@@ -65,12 +65,12 @@ export RUUVI_JSONLINES_PATH=data/telemetry.jsonl  # Optional, default shown
 export RUUVI_JSONLINES_DEBUG_LOGGING=true          # Optional, default shown
 
 # Run
-java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 Or inline:
 ```shell
-RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 #### 3. DuckDB Sink
@@ -94,17 +94,17 @@ export RUUVI_DUCKDB_TABLE_NAME=telemetry          # Optional, default shown
 export RUUVI_DUCKDB_DEBUG_LOGGING=true            # Optional, default shown
 
 # Run
-java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 Or inline:
 ```shell
-RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 **For in-memory database:**
 ```shell
-RUUVI_SINK_TYPE=duckdb RUUVI_DUCKDB_PATH=":memory:" java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+RUUVI_SINK_TYPE=duckdb RUUVI_DUCKDB_PATH=":memory:" java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 **Querying the database:**
@@ -151,12 +151,12 @@ export RUUVI_HTTP_TIMEOUT_SECONDS=30                # Optional, default shown
 export RUUVI_HTTP_MAX_RETRIES=3                     # Optional, default shown
 
 # Run
-java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 Or inline:
 ```shell
-RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://localhost:8081 RUUVI_HTTP_SENSOR_NAME=my-sensor java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://localhost:8081 RUUVI_HTTP_SENSOR_NAME=my-sensor java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 **API Format:**
@@ -295,45 +295,45 @@ make test-sinks
 
 ```shell
 # Console output
-ruuvi-reader-rs | java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+ruuvi-reader-rs | java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # Save to file
-ruuvi-reader-rs | RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+ruuvi-reader-rs | RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 # Data saved to: data/telemetry.jsonl
 
 # Save to DuckDB database
-ruuvi-reader-rs | RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+ruuvi-reader-rs | RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 # Data saved to: data/telemetry.db
 
 # Send to HTTP API
-ruuvi-reader-rs | RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com RUUVI_HTTP_SENSOR_NAME=outdoor-sensor java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+ruuvi-reader-rs | RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com RUUVI_HTTP_SENSOR_NAME=outdoor-sensor java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 #### From File
 
 ```shell
 # Console sink
-cat telemetry.jsonl | java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+cat telemetry.jsonl | java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # JSON Lines sink with custom path
 cat telemetry.jsonl | \
   RUUVI_SINK_TYPE=jsonlines \
   RUUVI_JSONLINES_PATH=/var/log/ruuvi/output.jsonl \
-  java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+  java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # DuckDB sink with custom path and table
 cat telemetry.jsonl | \
   RUUVI_SINK_TYPE=duckdb \
   RUUVI_DUCKDB_PATH=/var/data/sensor.db \
   RUUVI_DUCKDB_TABLE_NAME=ruuvi_data \
-  java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+  java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 
 # HTTP sink with custom API
 cat telemetry.jsonl | \
   RUUVI_SINK_TYPE=http \
   RUUVI_HTTP_API_URL=http://api.example.com \
   RUUVI_HTTP_SENSOR_NAME=my-sensor \
-  java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+  java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
 #### Fan-out to Multiple Sinks
@@ -341,10 +341,10 @@ cat telemetry.jsonl | \
 ```shell
 # Using tee to write to multiple sinks simultaneously
 ruuvi-reader-rs | tee \
-  >(RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
-  >(RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
-  >(RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
-  >(java -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar)
+  >(RUUVI_SINK_TYPE=jsonlines java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
+  >(RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
+  >(RUUVI_SINK_TYPE=http RUUVI_HTTP_API_URL=http://api.example.com java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar) \
+  >(java -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar)
 ```
 
 ### Data Format
@@ -401,11 +401,6 @@ Error parsing telemetry: ...
 ```
 - Verify input JSON matches the expected schema
 - Check for malformed JSON (use `jq` to validate)
-
-**OutOfMemoryError:**
-```shell
-java -Xmx2G -jar target/scala-3.6.2/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
-```
 
 **File Permission Errors (JSON Lines sink):**
 - Ensure write permissions for output directory

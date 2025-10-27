@@ -1,0 +1,11 @@
+# SBT JVM options
+# https://www.scala-sbt.org/1.x/docs/Command-Line-Reference.html#sbt+JVM+options+and+system+properties
+
+# Increase heap size for assembly builds
+-J-Xmx2G
+
+# Increase metaspace for large dependencies
+-J-XX:MaxMetaspaceSize=512M
+
+# Improve GC performance
+-J-XX:+UseG1GC
