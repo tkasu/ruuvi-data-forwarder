@@ -153,12 +153,20 @@ object App extends ZIOAppDefault:
               ZIO.logInfo(
                 s"Timeout: ${httpConfig.timeoutSeconds}s, Max retries: ${httpConfig.maxRetries}"
               ) *>
+              ZIO.logInfo(
+                s"Batch size: ${httpConfig.desiredBatchSize}"
+              ) *>
+              ZIO.logInfo(
+                s"Batch latency: ${httpConfig.desiredMaxBatchLatencySeconds}s"
+              ) *>
               ZIO.succeed(
                 HttpSensorValuesSink(
                   httpConfig.apiUrl,
                   httpConfig.debugLogging,
                   httpConfig.timeoutSeconds,
-                  httpConfig.maxRetries
+                  httpConfig.maxRetries,
+                  httpConfig.desiredBatchSize,
+                  httpConfig.desiredMaxBatchLatencySeconds
                 )
               )
           case None =>

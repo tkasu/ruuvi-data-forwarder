@@ -86,7 +86,11 @@ case class HttpConfig(
     @name("timeout-seconds")
     timeoutSeconds: Int = 30,
     @name("max-retries")
-    maxRetries: Int = 3
+    maxRetries: Int = 3,
+    @name("desired-batch-size")
+    desiredBatchSize: Int = 5,
+    @name("desired-max-batch-latency-seconds")
+    desiredMaxBatchLatencySeconds: Int = 30
 )
 
 object HttpConfig:
