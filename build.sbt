@@ -21,7 +21,7 @@ lazy val root = project
       "dev.zio" %% "zio-logging-slf4j2" % "2.3.2",
       "ch.qos.logback" % "logback-classic" % "1.5.6",
       "dev.zio" %% "zio-http" % "3.0.1",
-      "org.duckdb" % "duckdb_jdbc" % "1.1.3",
+      "org.duckdb" % "duckdb_jdbc" % "1.4.1.0",
       "dev.zio" %% "zio-test" % zioVersion % Test,
       "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
     ),

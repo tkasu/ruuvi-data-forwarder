@@ -11,6 +11,8 @@ import _root_.config.{
   SinkType,
   JsonLinesConfig,
   DuckDBConfig,
+  DuckLakeConfig,
+  CatalogType,
   HttpConfig
 }
 
@@ -95,6 +97,22 @@ object App extends ZIOAppDefault:
       case SinkType.DuckDB =>
         sinkConfig.duckdb match
           case Some(duckdbConfig) =>
+            val logDuckLake =
+              if duckdbConfig.ducklakeEnabled then
+                duckdbConfig.ducklake match
+                  case Some(dlConfig) =>
+                    ZIO.logInfo("DuckLake mode enabled") *>
+                      ZIO.logInfo(
+                        s"Catalog type: ${dlConfig.catalogType}"
+                      ) *>
+                      ZIO.logInfo(s"Catalog path: ${dlConfig.catalogPath}") *>
+                      ZIO.logInfo(s"Data path: ${dlConfig.dataPath}")
+                  case None =>
+                    ZIO.logWarning(
+                      "DuckLake enabled but configuration is missing, falling back to standard DuckDB mode"
+                    )
+              else ZIO.logInfo("Using standard DuckDB mode")
+
             ZIO.logInfo(s"Using DuckDB sink: ${duckdbConfig.path}") *>
               ZIO.logInfo(s"Table name: ${duckdbConfig.tableName}") *>
               ZIO.logInfo(
@@ -106,13 +124,16 @@ object App extends ZIOAppDefault:
               ZIO.logInfo(
                 s"Batch latency: ${duckdbConfig.desiredMaxBatchLatencySeconds}s"
               ) *>
+              logDuckLake *>
               ZIO.succeed(
                 DuckDBSensorValuesSink(
                   duckdbConfig.path,
                   duckdbConfig.tableName,
                   duckdbConfig.debugLogging,
                   duckdbConfig.desiredBatchSize,
-                  duckdbConfig.desiredMaxBatchLatencySeconds
+                  duckdbConfig.desiredMaxBatchLatencySeconds,
+                  duckdbConfig.ducklakeEnabled,
+                  duckdbConfig.ducklake
                 )
               )
           case None =>

@@ -4,6 +4,7 @@ import zio.*
 import zio.test.*
 import zio.stream.*
 import dto.RuuviTelemetry
+import _root_.config.{DuckLakeConfig, CatalogType}
 import java.sql.{DriverManager, ResultSet}
 import java.nio.file.{Files, Paths}
 
@@ -663,5 +664,212 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
       yield count
 
       assertZIO(writeWithBatching)(Assertion.equalTo(3))
+    },
+    test(
+      "DuckDBSensorValuesSink with DuckLake (DuckDB catalog) should write telemetry"
+    ) {
+      val tempCatalog = Files.createTempFile("ruuvi-test-ducklake-catalog-", ".ducklake")
+      val tempDataDir = Files.createTempDirectory("ruuvi-test-ducklake-data-")
+      Files.deleteIfExists(tempCatalog)
+
+      val testTelemetry = RuuviTelemetry(
+        batteryPotential = 2335,
+        humidity = 653675,
+        macAddress = Seq(254, 38, 136, 122, 102, 102),
+        measurementTsMs = 1693460525699L,
+        measurementSequenceNumber = 53300,
+        movementCounter = 2,
+        pressure = 100755,
+        temperatureMillicelsius = -29020,
+        txPower = 4
+      )
+
+      val ducklakeConfig = DuckLakeConfig(
+        catalogType = CatalogType.DuckDB,
+        catalogPath = tempCatalog.toString,
+        dataPath = tempDataDir.toString
+      )
+
+      val sink = DuckDBSensorValuesSink(
+        dbPath = "", // Not used in DuckLake mode
+        tableName = "telemetry",
+        debugLogging = false,
+        desiredBatchSize = 5,
+        desiredMaxBatchLatencySeconds = 30,
+        ducklakeEnabled = true,
+        ducklakeConfig = Some(ducklakeConfig)
+      )
+
+      val writeAndRead = for
+        _ <- ZStream
+          .fromIterable(List(testTelemetry))
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
+
+        // Read data from DuckLake
+        record <- ZIO.attemptBlocking {
+          Class.forName("org.duckdb.DuckDBDriver")
+          val conn = DriverManager.getConnection("jdbc:duckdb:")
+
+          // Install and load extensions
+          val installStmt = conn.createStatement()
+          installStmt.execute("INSTALL ducklake")
+          installStmt.execute("LOAD ducklake")
+          installStmt.close()
+
+          // Attach DuckLake
+          val attachStmt = conn.createStatement()
+          attachStmt.execute(
+            s"ATTACH 'ducklake:${tempCatalog.toString}' AS ducklake (DATA_PATH '${tempDataDir.toString}')"
+          )
+          attachStmt.close()
+
+          val stmt = conn.createStatement()
+          val rs = stmt.executeQuery("SELECT * FROM ducklake.telemetry LIMIT 1")
+
+          rs.next()
+          val result = RuuviTelemetry(
+            temperatureMillicelsius = rs.getInt("temperature_millicelsius"),
+            humidity = rs.getInt("humidity"),
+            pressure = rs.getInt("pressure"),
+            batteryPotential = rs.getInt("battery_potential"),
+            txPower = rs.getInt("tx_power"),
+            movementCounter = rs.getInt("movement_counter"),
+            measurementSequenceNumber = rs.getInt("measurement_sequence_number"),
+            measurementTsMs = rs.getLong("measurement_ts_ms"),
+            macAddress = rs
+              .getString("mac_address")
+              .split(":")
+              .map(Integer.parseInt(_, 16).toShort)
+              .toSeq
+          )
+
+          rs.close()
+          stmt.close()
+          conn.close()
+          result
+        }
+
+        // Clean up
+        _ <- ZIO.attempt {
+          Files.deleteIfExists(tempCatalog)
+          // Clean up data directory and its contents
+          Files
+            .walk(tempDataDir)
+            .sorted(java.util.Comparator.reverseOrder())
+            .forEach(Files.deleteIfExists(_))
+        }
+      yield record
+
+      assertZIO(writeAndRead)(Assertion.equalTo(testTelemetry))
+    },
+    test(
+      "DuckDBSensorValuesSink with DuckLake should append to existing data"
+    ) {
+      val tempCatalog = Files.createTempFile("ruuvi-test-ducklake-append-catalog-", ".ducklake")
+      val tempDataDir = Files.createTempDirectory("ruuvi-test-ducklake-append-data-")
+      Files.deleteIfExists(tempCatalog)
+
+      val firstTelemetry = RuuviTelemetry(
+        batteryPotential = 2335,
+        humidity = 653675,
+        macAddress = Seq(254, 38, 136, 122, 102, 102),
+        measurementTsMs = 1693460525699L,
+        measurementSequenceNumber = 53300,
+        movementCounter = 2,
+        pressure = 100755,
+        temperatureMillicelsius = -29020,
+        txPower = 4
+      )
+
+      val secondTelemetry = RuuviTelemetry(
+        batteryPotential = 2176,
+        humidity = 576425,
+        macAddress = Seq(213, 18, 52, 102, 20, 20),
+        measurementTsMs = 1693460525701L,
+        measurementSequenceNumber = 1589,
+        movementCounter = 79,
+        pressure = 100556,
+        temperatureMillicelsius = 22080,
+        txPower = 4
+      )
+
+      val ducklakeConfig = DuckLakeConfig(
+        catalogType = CatalogType.DuckDB,
+        catalogPath = tempCatalog.toString,
+        dataPath = tempDataDir.toString
+      )
+
+      val sink = DuckDBSensorValuesSink(
+        dbPath = "",
+        tableName = "telemetry",
+        debugLogging = false,
+        desiredBatchSize = 5,
+        desiredMaxBatchLatencySeconds = 30,
+        ducklakeEnabled = true,
+        ducklakeConfig = Some(ducklakeConfig)
+      )
+
+      val writeAndRead = for
+        // Write first record
+        _ <- ZStream
+          .fromIterable(List(firstTelemetry))
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
+
+        // Write second record
+        _ <- ZStream
+          .fromIterable(List(secondTelemetry))
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
+
+        // Read all records
+        count <- ZIO.attemptBlocking {
+          Class.forName("org.duckdb.DuckDBDriver")
+          val conn = DriverManager.getConnection("jdbc:duckdb:")
+
+          val installStmt = conn.createStatement()
+          installStmt.execute("INSTALL ducklake")
+          installStmt.execute("LOAD ducklake")
+          installStmt.close()
+
+          val attachStmt = conn.createStatement()
+          attachStmt.execute(
+            s"ATTACH 'ducklake:${tempCatalog.toString}' AS ducklake (DATA_PATH '${tempDataDir.toString}')"
+          )
+          attachStmt.close()
+
+          val stmt = conn.createStatement()
+          val rs = stmt.executeQuery("SELECT COUNT(*) as count FROM ducklake.telemetry")
+
+          rs.next()
+          val result = rs.getInt("count")
+
+          rs.close()
+          stmt.close()
+          conn.close()
+          result
+        }
+
+        // Clean up
+        _ <- ZIO.attempt {
+          Files.deleteIfExists(tempCatalog)
+          Files
+            .walk(tempDataDir)
+            .sorted(java.util.Comparator.reverseOrder())
+            .forEach(Files.deleteIfExists(_))
+        }
+      yield count
+
+      assertZIO(writeAndRead)(Assertion.equalTo(2))
     }
   )

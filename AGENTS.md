@@ -2,7 +2,7 @@
 
 ## Overview
 
-**ruuvi-data-forwarder** is a Scala 3 application built with ZIO that acts as middleware in the Ruuvitag telemetry pipeline. It processes sensor data from various sources and forwards it to configurable targets. Currently implements Console (stdout) and JSON Lines (file) sinks with full configuration support.
+**ruuvi-data-forwarder** is a Scala 3 application built with ZIO that acts as middleware in the Ruuvitag telemetry pipeline. It processes sensor data from various sources and forwards it to configurable targets. Currently implements Console (stdout), JSON Lines (file), DuckDB (database), DuckLake (lakehouse), and HTTP sinks with full configuration support.
 
 **Status:** Active Development
 
@@ -16,7 +16,7 @@ This utility serves as the data processing and routing layer by:
 - Reading sensor telemetry from configurable sources (currently stdin)
 - Parsing and validating JSON data into type-safe models
 - Transforming and enriching data as needed
-- Forwarding data to multiple sinks (currently stdout, future: HTTP, S3, DB)
+- Forwarding data to multiple sinks (Console, JSON Lines, DuckDB, DuckLake, HTTP)
 - Providing robust error handling and stream processing capabilities
 
 ## Architecture
@@ -51,7 +51,9 @@ ruuvi-data-forwarder/
 │   │   └── sinks/
 │   │       ├── SensorValuesSink.scala          # Sink trait
 │   │       ├── ConsoleSensorValuesSink.scala   # Stdout implementation
-│   │       └── JsonLinesSensorValuesSink.scala # JSON Lines file sink
+│   │       ├── JsonLinesSensorValuesSink.scala # JSON Lines file sink
+│   │       ├── DuckDBSensorValuesSink.scala    # DuckDB/DuckLake sink
+│   │       └── HttpSensorValuesSink.scala      # HTTP API sink
 │   ├── main/resources/
 │   │   ├── application.conf                     # Configuration (HOCON)
 │   │   └── logback.xml                          # Logging configuration
@@ -82,7 +84,7 @@ ruuvi-data-forwarder/
 
 - `selectSink()` - Sink selection based on configuration:
   1. Reads SinkConfig to determine which sink to use
-  2. Creates appropriate sink instance (Console or JsonLines)
+  2. Creates appropriate sink instance (Console, JsonLines, DuckDB, or HTTP)
   3. Returns configured sink wrapped in ZIO
 
 - `run()` - Application entry point:
@@ -103,18 +105,40 @@ ruuvi-data-forwarder/
 - `SourceError` - ADT with `RuuviParseError(msg, cause)` and `StreamShutdown`
 
 **sinks/** - Output abstractions
-- `SensorValuesSink` - Trait providing `ZSink[Any, Any, RuuviTelemetry, Nothing, Unit]`
+- `SensorValuesSink` - Trait providing `ZSink[Any, Any, Chunk[RuuviTelemetry], Nothing, Unit]`
 - `ConsoleSensorValuesSink` - Writes JSON to stdout with trailing newline
 - `JsonLinesSensorValuesSink` - Writes JSON Lines to file with:
   - Automatic parent directory creation
   - Append mode (doesn't overwrite existing files)
   - Optional debug logging of each telemetry record
   - Configurable output path
+- `DuckDBSensorValuesSink` - Writes to DuckDB database or DuckLake lakehouse with:
+  - Two modes: standard DuckDB or DuckLake (lakehouse format)
+  - DuckDB mode: Single database file with direct SQL operations
+  - DuckLake mode: Catalog database + Parquet data files
+  - Support for DuckDB, SQLite, or PostgreSQL catalog databases
+  - Automatic table creation and schema management
+  - Batch insertion for optimal performance
+  - Configurable batch size and latency
+  - SQL injection protection via table name validation
+- `HttpSensorValuesSink` - Posts telemetry to HTTP API with:
+  - Configurable endpoint URL and sensor name
+  - Retry logic with exponential backoff
+  - Timeout configuration
 
 **config/** - Configuration management
 - `AppConfig` - Main application configuration
 - `SinkConfig` - Sink-specific configuration with type-safe enums
+- `SinkType` - Enum for sink types: Console, JsonLines, DuckDB, Http
 - `JsonLinesConfig` - JSON Lines sink configuration (path, debug logging)
+- `DuckDBConfig` - DuckDB/DuckLake configuration:
+  - Standard DuckDB: path, table-name
+  - DuckLake mode: ducklake-enabled flag
+  - Catalog type selection (DuckDB, SQLite, PostgreSQL)
+  - Separate paths for catalog and data files
+- `DuckLakeConfig` - DuckLake-specific settings (catalog-type, catalog-path, data-path)
+- `CatalogType` - Enum for catalog database types: DuckDB, SQLite, Postgres
+- `HttpConfig` - HTTP sink configuration (api-url, sensor-name, timeout, retries)
 - Configuration loaded from `application.conf` with environment variable overrides
 
 ### Design Patterns
@@ -244,6 +268,55 @@ RUUVI_SINK_TYPE=jsonlines RUUVI_JSONLINES_DEBUG_LOGGING=false \
   java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
 ```
 
+**DuckDB Sink (Standard Mode):**
+```bash
+# Write to default DuckDB database (data/telemetry.db)
+RUUVI_SINK_TYPE=duckdb java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+
+# With custom path and table name
+RUUVI_SINK_TYPE=duckdb \
+  RUUVI_DUCKDB_PATH=/var/lib/ruuvi/telemetry.db \
+  RUUVI_DUCKDB_TABLE_NAME=sensor_data \
+  java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+
+# With custom batch settings
+RUUVI_SINK_TYPE=duckdb \
+  RUUVI_DUCKDB_DESIRED_BATCH_SIZE=100 \
+  RUUVI_DUCKDB_DESIRED_MAX_BATCH_LATENCY_SECONDS=60 \
+  java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+```
+
+**DuckLake Sink (Lakehouse Mode):**
+```bash
+# Write to DuckLake with SQLite catalog (default for local use)
+RUUVI_SINK_TYPE=duckdb \
+  RUUVI_DUCKDB_DUCKLAKE_ENABLED=true \
+  java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+
+# With custom catalog and data paths
+RUUVI_SINK_TYPE=duckdb \
+  RUUVI_DUCKDB_DUCKLAKE_ENABLED=true \
+  RUUVI_DUCKDB_DUCKLAKE_CATALOG_TYPE=sqlite \
+  RUUVI_DUCKDB_DUCKLAKE_CATALOG_PATH=/var/lib/ruuvi/catalog.sqlite \
+  RUUVI_DUCKDB_DUCKLAKE_DATA_PATH=/var/lib/ruuvi/parquet_files/ \
+  java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+
+# With DuckDB catalog (single client, faster)
+RUUVI_SINK_TYPE=duckdb \
+  RUUVI_DUCKDB_DUCKLAKE_ENABLED=true \
+  RUUVI_DUCKDB_DUCKLAKE_CATALOG_TYPE=duckdb \
+  RUUVI_DUCKDB_DUCKLAKE_CATALOG_PATH=data/catalog.ducklake \
+  java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+
+# With PostgreSQL catalog (multi-client, distributed)
+RUUVI_SINK_TYPE=duckdb \
+  RUUVI_DUCKDB_DUCKLAKE_ENABLED=true \
+  RUUVI_DUCKDB_DUCKLAKE_CATALOG_TYPE=postgres \
+  RUUVI_DUCKDB_DUCKLAKE_CATALOG_PATH="dbname=ruuvi_catalog host=localhost user=postgres" \
+  RUUVI_DUCKDB_DUCKLAKE_DATA_PATH=/shared/ruuvi/data/ \
+  java -jar target/scala-3.*/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
+```
+
 ### Testing
 
 **Unit Tests:**
@@ -268,17 +341,43 @@ make test-console-sink
 # Test JSON Lines sink
 make test-jsonlines-sink
 
+# Test DuckDB sink
+make test-duckdb-sink
+
+# Test DuckLake sink
+make test-ducklake-sink
+
 # Test all sinks
 make test-sinks
 ```
 
+**Data Management:**
+```bash
+# Remove all data files (DB, JSON, DuckLake)
+make clean-data
+
+# Remove only integration test data
+make clean-test-data
+
+# Remove only DuckLake catalog and data files
+make clean-ducklake-data
+```
+
 **Test Coverage:**
-- ✅ 4 unit tests passing
+- ✅ 10 unit tests passing (as of DuckLake implementation)
 - `AppSpec` - Verifies stdin to stdout pipeline
 - `JsonLinesSensorValuesSinkSpec` - Tests JSON Lines sink:
   - Write telemetry to file
   - Create parent directories automatically
   - Append to existing files
+- `DuckDBSensorValuesSinkSpec` - Tests DuckDB sink:
+  - Write telemetry to in-memory and file databases
+  - Create database and table automatically
+  - Append to existing database
+  - Batch insertion
+  - Table name validation (SQL injection protection)
+  - DuckLake mode with DuckDB catalog
+  - DuckLake append operations
 - All tests validate JSON parsing and serialization
 
 ## Configuration
@@ -291,36 +390,82 @@ Configuration is loaded from `src/main/resources/application.conf` with environm
 ```hocon
 # application.conf
 sink {
-    # Sink type: "console" or "jsonlines"
+    # Sink type: "console", "jsonlines", "duckdb", or "http"
     sink-type = "console"
     sink-type = ${?RUUVI_SINK_TYPE}
 
     json-lines {
-      # Output file path
       path = "data/telemetry.jsonl"
       path = ${?RUUVI_JSONLINES_PATH}
-
-      # Enable debug logging (logs each telemetry to debug level)
       debug-logging = true
       debug-logging = ${?RUUVI_JSONLINES_DEBUG_LOGGING}
+    }
+
+    duckdb {
+      path = "data/telemetry.db"
+      path = ${?RUUVI_DUCKDB_PATH}
+      table-name = "telemetry"
+      table-name = ${?RUUVI_DUCKDB_TABLE_NAME}
+      debug-logging = true
+      debug-logging = ${?RUUVI_DUCKDB_DEBUG_LOGGING}
+      desired-batch-size = 5
+      desired-batch-size = ${?RUUVI_DUCKDB_DESIRED_BATCH_SIZE}
+      desired-max-batch-latency-seconds = 30
+      desired-max-batch-latency-seconds = ${?RUUVI_DUCKDB_DESIRED_MAX_BATCH_LATENCY_SECONDS}
+
+      # DuckLake mode (lakehouse format)
+      ducklake-enabled = false
+      ducklake-enabled = ${?RUUVI_DUCKDB_DUCKLAKE_ENABLED}
+
+      ducklake {
+        catalog-type = "sqlite"  # "duckdb", "sqlite", or "postgres"
+        catalog-type = ${?RUUVI_DUCKDB_DUCKLAKE_CATALOG_TYPE}
+        catalog-path = "data/catalog.sqlite"
+        catalog-path = ${?RUUVI_DUCKDB_DUCKLAKE_CATALOG_PATH}
+        data-path = "data/ducklake_files/"
+        data-path = ${?RUUVI_DUCKDB_DUCKLAKE_DATA_PATH}
+      }
     }
 }
 ```
 
 **Environment Variables:**
-- `RUUVI_SINK_TYPE` - Sink type: `console` or `jsonlines`
+
+Console & JSON Lines:
+- `RUUVI_SINK_TYPE` - Sink type: `console`, `jsonlines`, `duckdb`, or `http`
 - `RUUVI_JSONLINES_PATH` - Output file path for JSON Lines sink
 - `RUUVI_JSONLINES_DEBUG_LOGGING` - Enable/disable debug logging (`true`/`false`)
+
+DuckDB (Standard Mode):
+- `RUUVI_DUCKDB_PATH` - Path to DuckDB database file
+- `RUUVI_DUCKDB_TABLE_NAME` - Table name for storing telemetry
+- `RUUVI_DUCKDB_DEBUG_LOGGING` - Enable/disable debug logging
+- `RUUVI_DUCKDB_DESIRED_BATCH_SIZE` - Number of records per batch
+- `RUUVI_DUCKDB_DESIRED_MAX_BATCH_LATENCY_SECONDS` - Max seconds before flushing batch
+
+DuckLake (Lakehouse Mode):
+- `RUUVI_DUCKDB_DUCKLAKE_ENABLED` - Enable DuckLake mode (`true`/`false`)
+- `RUUVI_DUCKDB_DUCKLAKE_CATALOG_TYPE` - Catalog database: `duckdb`, `sqlite`, or `postgres`
+- `RUUVI_DUCKDB_DUCKLAKE_CATALOG_PATH` - Path to catalog database file (or connection string for PostgreSQL)
+- `RUUVI_DUCKDB_DUCKLAKE_DATA_PATH` - Directory for Parquet data files
 
 **Configuration Models:**
 - `AppConfig` - Main application configuration
 - `SinkConfig` - Sink configuration with type-safe enum (`SinkType`)
+- `SinkType` - Enum: Console, JsonLines, DuckDB, Http
 - `JsonLinesConfig` - JSON Lines sink configuration
+- `DuckDBConfig` - DuckDB/DuckLake configuration
+- `DuckLakeConfig` - DuckLake-specific settings
+- `CatalogType` - Enum: DuckDB, SQLite, Postgres
+- `HttpConfig` - HTTP sink configuration
+
+**DuckLake Catalog Database Options:**
+- **DuckDB**: Single-client, file-based. Best for local single-process usage.
+- **SQLite**: Multi-client with retry logic. Best for local multi-process usage.
+- **PostgreSQL**: Fully distributed. Best for multi-user/multi-host environments.
 
 **Future Sinks (Planned):**
-- HTTP sink for posting to REST APIs
 - S3 sink for cloud storage
-- PostgreSQL/TimescaleDB sink for time-series data
 - Kafka sink for event streaming
 
 ## Integration

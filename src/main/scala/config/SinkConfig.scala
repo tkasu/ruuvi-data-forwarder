@@ -31,6 +31,35 @@ case class JsonLinesConfig(
 object JsonLinesConfig:
   val descriptor: Config[JsonLinesConfig] = deriveConfig[JsonLinesConfig]
 
+enum CatalogType:
+  case DuckDB, SQLite, Postgres
+
+object CatalogType:
+  given Config[CatalogType] =
+    Config.string.mapOrFail {
+      case "duckdb"   => Right(CatalogType.DuckDB)
+      case "sqlite"   => Right(CatalogType.SQLite)
+      case "postgres" => Right(CatalogType.Postgres)
+      case other =>
+        Left(
+          Config.Error.InvalidData(message =
+            s"Invalid catalog type: $other. Must be 'duckdb', 'sqlite', or 'postgres'"
+          )
+        )
+    }
+
+case class DuckLakeConfig(
+    @name("catalog-type")
+    catalogType: CatalogType,
+    @name("catalog-path")
+    catalogPath: String,
+    @name("data-path")
+    dataPath: String
+)
+
+object DuckLakeConfig:
+  val descriptor: Config[DuckLakeConfig] = deriveConfig[DuckLakeConfig]
+
 case class DuckDBConfig(
     path: String,
     @name("table-name")
@@ -40,7 +69,10 @@ case class DuckDBConfig(
     @name("desired-batch-size")
     desiredBatchSize: Int,
     @name("desired-max-batch-latency-seconds")
-    desiredMaxBatchLatencySeconds: Int
+    desiredMaxBatchLatencySeconds: Int,
+    @name("ducklake-enabled")
+    ducklakeEnabled: Boolean,
+    ducklake: Option[DuckLakeConfig]
 )
 
 object DuckDBConfig:
