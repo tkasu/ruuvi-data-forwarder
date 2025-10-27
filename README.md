@@ -402,11 +402,6 @@ Error parsing telemetry: ...
 - Verify input JSON matches the expected schema
 - Check for malformed JSON (use `jq` to validate)
 
-**OutOfMemoryError:**
-```shell
-java -Xmx2G -jar target/scala-3.7.3/ruuvi-data-forwarder-assembly-0.1.0-SNAPSHOT.jar
-```
-
 **File Permission Errors (JSON Lines sink):**
 - Ensure write permissions for output directory
 - Check parent directory creation (done automatically)

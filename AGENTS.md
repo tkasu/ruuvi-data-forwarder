@@ -433,10 +433,6 @@ Key dependencies from build.sbt:
 - Check for invalid UTF-8 or malformed JSON
 - Look for errors logged to stderr
 
-**Issue: OutOfMemoryError with large streams**
-- Increase JVM heap: `java -Xmx2G -jar forwarder.jar`
-- ZIO Streams should handle backpressure automatically
-
 **Issue: Tests fail on formatting**
 ```bash
 # Auto-fix formatting issues
