@@ -207,6 +207,9 @@ class DuckDBSensorValuesSink(
           mac_address
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       """
+      // Wrap batch execution in an explicit transaction so rollback always has
+      // an active transaction to target (fixes "cannot rollback - no transaction is active" error).
+      conn.setAutoCommit(false)
       val pstmt = conn.prepareStatement(insertSQL)
       try
         telemetryBatch.foreach { telemetry =>
@@ -226,5 +229,10 @@ class DuckDBSensorValuesSink(
           pstmt.addBatch()
         }
         pstmt.executeBatch()
+        conn.commit()
+      catch
+        case e: Exception =>
+          conn.rollback()
+          throw e
       finally pstmt.close()
     }
