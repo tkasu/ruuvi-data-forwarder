@@ -39,32 +39,46 @@ class HttpSensorValuesSink(
 
   def make: ZSink[Any, Throwable, Chunk[RuuviTelemetry], Nothing, Unit] =
     ZSink.foreach { chunk =>
-      ZIO.foreachDiscard(chunk) { telemetry =>
+      if chunk.isEmpty then ZIO.unit
+      else
         for
           _ <- ZIO
             .logDebug(
-              s"Sending telemetry to HTTP API ($apiUrl): ${telemetry.macAddress.mkString(",")}"
+              s"Sending batch of ${chunk.size} telemetries to HTTP API ($apiUrl)"
             )
             .when(debugLogging)
-          // Send telemetry with proper error handling
-          _ <- sendTelemetry(telemetry).catchAll { error =>
+          // Send batch with proper error handling
+          _ <- sendBatch(chunk.toList).catchAll { error =>
             // Always log and continue - never crash the stream
             ZIO.logError(
-              s"Failed to send telemetry: ${error.getMessage}"
+              s"Failed to send batch: ${error.getMessage}"
             ) *> ZIO.unit
           }
         yield ()
-      }
     }
 
-  private def sendTelemetry(
-      telemetry: RuuviTelemetry
+  private def sendBatch(
+      telemetries: List[RuuviTelemetry]
   ): ZIO[Any, Throwable, Unit] =
     val sendRequest = for
-      payload <- ZIO.succeed(convertToApiFormat(telemetry))
+      // Convert all telemetries to API format and flatten into a single list
+      allTelemetryData <- ZIO.succeed(
+        telemetries.flatMap(convertToApiFormat)
+      )
+      // Group by telemetry_type and merge measurements
+      groupedByType = allTelemetryData
+        .groupBy(_.telemetry_type)
+        .map { case (telemetryType, dataList) =>
+          TelemetryData(
+            telemetry_type = telemetryType,
+            data = dataList.flatMap(_.data)
+          )
+        }
+        .toList
+      payload = groupedByType
       json <- ZIO.succeed(payload.toJson)
       _ <- ZIO
-        .logDebug(s"Request payload: $json")
+        .logDebug(s"Request payload (${telemetries.size} telemetries): $json")
         .when(debugLogging)
       // Construct URL for POST /telemetry endpoint
       url = s"${apiUrl.stripSuffix("/")}/telemetry"
@@ -91,11 +105,13 @@ class HttpSensorValuesSink(
       body <- response.body.asString
       _ <- response.status match
         case Status.Created =>
-          ZIO.logInfo(s"Telemetry sent successfully to $url")
+          ZIO.logInfo(
+            s"Batch of ${telemetries.size} telemetries sent successfully to $url"
+          )
         case status if status.isClientError =>
           // 4xx errors - client errors, don't retry, just log
           ZIO.logWarning(
-            s"Client error sending telemetry to $url: ${status.code} ${response.status.text}. Response body: $body"
+            s"Client error sending batch to $url: ${status.code} ${response.status.text}. Response body: $body"
           )
         case status if status.isServerError =>
           // 5xx errors - server errors, should be retried
@@ -107,7 +123,7 @@ class HttpSensorValuesSink(
         case status =>
           // Other unexpected status codes
           ZIO.logWarning(
-            s"Unexpected status sending telemetry to $url: ${status.code} ${response.status.text}. Response body: $body"
+            s"Unexpected status sending batch to $url: ${status.code} ${response.status.text}. Response body: $body"
           )
     yield ()
 
