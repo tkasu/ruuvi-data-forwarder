@@ -877,5 +877,104 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
       yield count
 
       assertZIO(writeAndRead)(Assertion.equalTo(2))
+    },
+    test(
+      "DuckDBSensorValuesSink with DuckLake should resolve relative paths to absolute"
+    ) {
+      // Use paths that are relative to the current working directory.
+      // The sink must convert them to absolute before building the ATTACH SQL so that
+      // the path baked into the DuckLake catalog metadata is portable across working dirs.
+      val uniqueId = java.util.UUID.randomUUID().toString
+      val relativeCatalogPath = s"test-ducklake-rel-catalog-$uniqueId.ducklake"
+      val relativeDataPath = s"test-ducklake-rel-data-$uniqueId"
+
+      // Pre-compute the expected absolute paths so we can verify the catalog and
+      // data directory are created there (not only at the relative locations).
+      val expectedAbsCatalogPath =
+        Paths.get(relativeCatalogPath).toAbsolutePath.toString
+      val expectedAbsDataPath =
+        Paths.get(relativeDataPath).toAbsolutePath.toString
+
+      val testTelemetry = RuuviTelemetry(
+        batteryPotential = 2335,
+        humidity = 653675,
+        macAddress = Seq(254, 38, 136, 122, 102, 102),
+        measurementTsMs = 1693460525699L,
+        measurementSequenceNumber = 53300,
+        movementCounter = 2,
+        pressure = 100755,
+        temperatureMillicelsius = -29020,
+        txPower = 4
+      )
+
+      val ducklakeConfig = DuckLakeConfig(
+        catalogType = CatalogType.DuckDB,
+        catalogPath = relativeCatalogPath, // relative path
+        dataPath = relativeDataPath        // relative path
+      )
+
+      val sink = DuckDBSensorValuesSink(
+        dbPath = "",
+        tableName = "telemetry",
+        debugLogging = false,
+        desiredBatchSize = 5,
+        desiredMaxBatchLatencySeconds = 30,
+        ducklakeEnabled = true,
+        ducklakeConfig = Some(ducklakeConfig)
+      )
+
+      val writeAndVerify = for
+        _ <- ZStream
+          .fromIterable(List(testTelemetry))
+          .groupedWithin(
+            sink.desiredBatchSize,
+            zio.Duration.fromSeconds(sink.desiredMaxBatchLatencySeconds.toLong)
+          )
+          .run(sink.make)
+
+        // Verify the catalog was created at the absolute path and that we can
+        // read data back from it using absolute paths, confirming the sink stored
+        // absolute paths in the catalog metadata rather than relative ones.
+        count <- ZIO.attemptBlocking {
+          Class.forName("org.duckdb.DuckDBDriver")
+          val conn = DriverManager.getConnection("jdbc:duckdb:")
+
+          val installStmt = conn.createStatement()
+          installStmt.execute("INSTALL ducklake")
+          installStmt.execute("LOAD ducklake")
+          installStmt.close()
+
+          val attachStmt = conn.createStatement()
+          attachStmt.execute(
+            s"ATTACH 'ducklake:$expectedAbsCatalogPath' AS ducklake (DATA_PATH '$expectedAbsDataPath')"
+          )
+          attachStmt.close()
+
+          val stmt = conn.createStatement()
+          val rs = stmt.executeQuery(
+            "SELECT COUNT(*) as count FROM ducklake.telemetry"
+          )
+          rs.next()
+          val result = rs.getInt("count")
+          rs.close()
+          stmt.close()
+          conn.close()
+          result
+        }
+
+        // Clean up
+        _ <- ZIO.attempt {
+          val catalogFile = Paths.get(expectedAbsCatalogPath)
+          Files.deleteIfExists(catalogFile)
+          val dataDir = Paths.get(expectedAbsDataPath)
+          if Files.exists(dataDir) then
+            Files
+              .walk(dataDir)
+              .sorted(java.util.Comparator.reverseOrder())
+              .forEach(Files.deleteIfExists(_))
+        }
+      yield count
+
+      assertZIO(writeAndVerify)(Assertion.equalTo(1))
     }
   )
