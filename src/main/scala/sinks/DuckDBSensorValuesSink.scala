@@ -232,7 +232,10 @@ class DuckDBSensorValuesSink(
         conn.commit()
       catch
         case e: Exception =>
-          conn.rollback()
+          try conn.rollback()
+          catch
+            case rollbackEx: Exception =>
+              e.addSuppressed(rollbackEx)
           throw e
       finally pstmt.close()
     }
