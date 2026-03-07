@@ -3,13 +3,14 @@ package sinks
 import zio.*
 import zio.test.*
 import _root_.config.{CatalogType, DuckLakeConfig, DuckLakeMaintenanceConfig}
-import java.nio.file.{Files, Paths}
+import java.nio.file.Files
+import scala.util.Using
 
 object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
 
   /** Build a DuckLakeConfig backed by a DuckDB catalog stored at the given
-    * paths. Maintenance is always enabled with a very long interval so it
-    * does not fire automatically during tests.
+    * paths. Maintenance is always enabled with a very long interval so it does
+    * not fire automatically during tests.
     */
   private def makeConfig(
       catalogPath: String,
@@ -21,15 +22,18 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
       catalogType = CatalogType.DuckDB,
       catalogPath = catalogPath,
       dataPath = dataPath,
-      maintenance = DuckLakeMaintenanceConfig(
-        enabled = maintenanceEnabled,
-        intervalSeconds = 9999,
-        expireOlderThan = expireOlderThan
+      maintenance = Some(
+        DuckLakeMaintenanceConfig(
+          enabled = maintenanceEnabled,
+          intervalSeconds = 9999,
+          expireOlderThan = expireOlderThan
+        )
       )
     )
 
   /** Seed a DuckLake catalog+data directory with at least one insert so that
-    * the maintenance functions (merge, expire, cleanup) have something to work on.
+    * the maintenance functions (merge, expire, cleanup) have something to work
+    * on.
     */
   private def seedDuckLake(
       catalogPath: String,
@@ -75,10 +79,11 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
         // Clean up
         _ <- ZIO.attempt {
           Files.deleteIfExists(tempCatalog)
-          Files
-            .walk(tempDataDir)
-            .sorted(java.util.Comparator.reverseOrder())
-            .forEach(Files.deleteIfExists(_))
+          Using.resource(Files.walk(tempDataDir)) { stream =>
+            stream
+              .sorted(java.util.Comparator.reverseOrder())
+              .forEach(Files.deleteIfExists(_))
+          }
         }
       yield true
 
@@ -99,15 +104,20 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
       val run = for
         _ <- seedDuckLake(catalogPath, dataPath)
         // Use a short expiry string to exercise the set_option path
-        config = makeConfig(catalogPath, dataPath, expireOlderThan = "2 minutes")
+        config = makeConfig(
+          catalogPath,
+          dataPath,
+          expireOlderThan = "2 minutes"
+        )
         maintenance = DuckLakeMaintenance(config)
         _ <- maintenance.runCheckpoint
         _ <- ZIO.attempt {
           Files.deleteIfExists(tempCatalog)
-          Files
-            .walk(tempDataDir)
-            .sorted(java.util.Comparator.reverseOrder())
-            .forEach(Files.deleteIfExists(_))
+          Using.resource(Files.walk(tempDataDir)) { stream =>
+            stream
+              .sorted(java.util.Comparator.reverseOrder())
+              .forEach(Files.deleteIfExists(_))
+          }
         }
       yield true
 
@@ -136,10 +146,11 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
         catalogCreated <- ZIO.attempt(Files.exists(tempCatalog))
         _ <- ZIO.attempt {
           Files.deleteIfExists(tempCatalog)
-          Files
-            .walk(tempDataDir)
-            .sorted(java.util.Comparator.reverseOrder())
-            .forEach(Files.deleteIfExists(_))
+          Using.resource(Files.walk(tempDataDir)) { stream =>
+            stream
+              .sorted(java.util.Comparator.reverseOrder())
+              .forEach(Files.deleteIfExists(_))
+          }
         }
       yield catalogCreated
 
@@ -169,10 +180,11 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
         _ <- ZIO.sleep(500.millis)
         _ <- ZIO.attempt {
           Files.deleteIfExists(tempCatalog)
-          Files
-            .walk(tempDataDir)
-            .sorted(java.util.Comparator.reverseOrder())
-            .forEach(Files.deleteIfExists(_))
+          Using.resource(Files.walk(tempDataDir)) { stream =>
+            stream
+              .sorted(java.util.Comparator.reverseOrder())
+              .forEach(Files.deleteIfExists(_))
+          }
         }
       yield true
 
