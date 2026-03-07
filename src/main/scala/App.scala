@@ -106,12 +106,26 @@ object App extends ZIOAppDefault:
                         s"Catalog type: ${dlConfig.catalogType}"
                       ) *>
                       ZIO.logInfo(s"Catalog path: ${dlConfig.catalogPath}") *>
-                      ZIO.logInfo(s"Data path: ${dlConfig.dataPath}")
+                      ZIO.logInfo(s"Data path: ${dlConfig.dataPath}") *>
+                      ZIO.logInfo(
+                        s"Maintenance enabled: ${dlConfig.maintenance.enabled}"
+                      ) *>
+                      ZIO.logInfo(
+                        s"Maintenance interval: ${dlConfig.maintenance.intervalSeconds}s"
+                      )
                   case None =>
                     ZIO.logWarning(
                       "DuckLake enabled but configuration is missing, falling back to standard DuckDB mode"
                     )
               else ZIO.logInfo("Using standard DuckDB mode")
+
+            val startMaintenance =
+              if duckdbConfig.ducklakeEnabled then
+                duckdbConfig.ducklake match
+                  case Some(dlConfig) =>
+                    DuckLakeMaintenance(dlConfig).startScheduler()
+                  case None => ZIO.unit
+              else ZIO.unit
 
             ZIO.logInfo(s"Using DuckDB sink: ${duckdbConfig.path}") *>
               ZIO.logInfo(s"Table name: ${duckdbConfig.tableName}") *>
@@ -125,6 +139,7 @@ object App extends ZIOAppDefault:
                 s"Batch latency: ${duckdbConfig.desiredMaxBatchLatencySeconds}s"
               ) *>
               logDuckLake *>
+              startMaintenance *>
               ZIO.succeed(
                 DuckDBSensorValuesSink(
                   duckdbConfig.path,
