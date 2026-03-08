@@ -67,7 +67,7 @@ case class DuckLakeConfig(
     catalogPath: String,
     @name("data-path")
     dataPath: String,
-    maintenance: DuckLakeMaintenanceConfig
+    maintenance: Option[DuckLakeMaintenanceConfig]
 )
 
 object DuckLakeConfig:

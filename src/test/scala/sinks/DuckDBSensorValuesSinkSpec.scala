@@ -4,7 +4,7 @@ import zio.*
 import zio.test.*
 import zio.stream.*
 import dto.RuuviTelemetry
-import _root_.config.{DuckLakeConfig, CatalogType, DuckLakeMaintenanceConfig}
+import _root_.config.{DuckLakeConfig, CatalogType}
 import java.sql.{DriverManager, ResultSet}
 import java.nio.file.{Files, Paths}
 
@@ -689,11 +689,7 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         catalogType = CatalogType.DuckDB,
         catalogPath = tempCatalog.toString,
         dataPath = tempDataDir.toString,
-        maintenance = DuckLakeMaintenanceConfig(
-          enabled = false,
-          intervalSeconds = 3600,
-          expireOlderThan = "1 week"
-        )
+        maintenance = None
       )
 
       val sink = DuckDBSensorValuesSink(
@@ -810,11 +806,7 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
         catalogType = CatalogType.DuckDB,
         catalogPath = tempCatalog.toString,
         dataPath = tempDataDir.toString,
-        maintenance = DuckLakeMaintenanceConfig(
-          enabled = false,
-          intervalSeconds = 3600,
-          expireOlderThan = "1 week"
-        )
+        maintenance = None
       )
 
       val sink = DuckDBSensorValuesSink(

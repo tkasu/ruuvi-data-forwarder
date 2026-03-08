@@ -3,7 +3,8 @@ package sinks
 import zio.*
 import zio.test.*
 import _root_.config.{CatalogType, DuckLakeConfig, DuckLakeMaintenanceConfig}
-import java.nio.file.{Files, Paths}
+import java.nio.file.Files
+import scala.util.Using
 
 object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
 
@@ -21,10 +22,12 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
       catalogType = CatalogType.DuckDB,
       catalogPath = catalogPath,
       dataPath = dataPath,
-      maintenance = DuckLakeMaintenanceConfig(
-        enabled = maintenanceEnabled,
-        intervalSeconds = 9999,
-        expireOlderThan = expireOlderThan
+      maintenance = Some(
+        DuckLakeMaintenanceConfig(
+          enabled = maintenanceEnabled,
+          intervalSeconds = 9999,
+          expireOlderThan = expireOlderThan
+        )
       )
     )
 
@@ -76,10 +79,11 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
         // Clean up
         _ <- ZIO.attempt {
           Files.deleteIfExists(tempCatalog)
-          Files
-            .walk(tempDataDir)
-            .sorted(java.util.Comparator.reverseOrder())
-            .forEach(Files.deleteIfExists(_))
+          Using.resource(Files.walk(tempDataDir)) { stream =>
+            stream
+              .sorted(java.util.Comparator.reverseOrder())
+              .forEach(Files.deleteIfExists(_))
+          }
         }
       yield true
 
@@ -109,10 +113,11 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
         _ <- maintenance.runCheckpoint
         _ <- ZIO.attempt {
           Files.deleteIfExists(tempCatalog)
-          Files
-            .walk(tempDataDir)
-            .sorted(java.util.Comparator.reverseOrder())
-            .forEach(Files.deleteIfExists(_))
+          Using.resource(Files.walk(tempDataDir)) { stream =>
+            stream
+              .sorted(java.util.Comparator.reverseOrder())
+              .forEach(Files.deleteIfExists(_))
+          }
         }
       yield true
 
@@ -141,10 +146,11 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
         catalogCreated <- ZIO.attempt(Files.exists(tempCatalog))
         _ <- ZIO.attempt {
           Files.deleteIfExists(tempCatalog)
-          Files
-            .walk(tempDataDir)
-            .sorted(java.util.Comparator.reverseOrder())
-            .forEach(Files.deleteIfExists(_))
+          Using.resource(Files.walk(tempDataDir)) { stream =>
+            stream
+              .sorted(java.util.Comparator.reverseOrder())
+              .forEach(Files.deleteIfExists(_))
+          }
         }
       yield catalogCreated
 
@@ -174,10 +180,11 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
         _ <- ZIO.sleep(500.millis)
         _ <- ZIO.attempt {
           Files.deleteIfExists(tempCatalog)
-          Files
-            .walk(tempDataDir)
-            .sorted(java.util.Comparator.reverseOrder())
-            .forEach(Files.deleteIfExists(_))
+          Using.resource(Files.walk(tempDataDir)) { stream =>
+            stream
+              .sorted(java.util.Comparator.reverseOrder())
+              .forEach(Files.deleteIfExists(_))
+          }
         }
       yield true
 

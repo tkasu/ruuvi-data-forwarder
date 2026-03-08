@@ -108,10 +108,10 @@ object App extends ZIOAppDefault:
                       ZIO.logInfo(s"Catalog path: ${dlConfig.catalogPath}") *>
                       ZIO.logInfo(s"Data path: ${dlConfig.dataPath}") *>
                       ZIO.logInfo(
-                        s"Maintenance enabled: ${dlConfig.maintenance.enabled}"
+                        s"Maintenance enabled: ${dlConfig.maintenance.exists(_.enabled)}"
                       ) *>
                       ZIO.logInfo(
-                        s"Maintenance interval: ${dlConfig.maintenance.intervalSeconds}s"
+                        s"Maintenance interval: ${dlConfig.maintenance.map(_.intervalSeconds).getOrElse(0)}s"
                       )
                   case None =>
                     ZIO.logWarning(
