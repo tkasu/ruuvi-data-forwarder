@@ -8,27 +8,25 @@ import java.nio.file.{Files, Paths}
 
 /** Handles scheduled DuckLake maintenance operations.
   *
-  * Runs the DuckLake `CHECKPOINT` statement on a fixed schedule. `CHECKPOINT` bundles all
-  * maintenance functions in order:
-  *   1. `ducklake_flush_inlined_data`
-  *   2. `ducklake_expire_snapshots`
-  *   3. `ducklake_merge_adjacent_files`
-  *   4. `ducklake_rewrite_data_files`
-  *   5. `ducklake_cleanup_old_files`
-  *   6. `ducklake_delete_orphaned_files`
+  * Runs the DuckLake `CHECKPOINT` statement on a fixed schedule. `CHECKPOINT`
+  * bundles all maintenance functions in order:
+  *   1. `ducklake_flush_inlined_data` 2. `ducklake_expire_snapshots` 3.
+  *      `ducklake_merge_adjacent_files` 4. `ducklake_rewrite_data_files` 5.
+  *      `ducklake_cleanup_old_files` 6. `ducklake_delete_orphaned_files`
   *
-  * Before running `CHECKPOINT`, the `expire_older_than` option is set on the catalog so that
-  * snapshot expiry and file cleanup use the configured retention window.
+  * Before running `CHECKPOINT`, the `expire_older_than` option is set on the
+  * catalog so that snapshot expiry and file cleanup use the configured
+  * retention window.
   *
-  * This runs concurrently with the append pipeline — DuckLake snapshot isolation ensures
-  * there are no conflicts with ongoing inserts.
+  * This runs concurrently with the append pipeline — DuckLake snapshot
+  * isolation ensures there are no conflicts with ongoing inserts.
   */
 class DuckLakeMaintenance(config: DuckLakeConfig):
 
   private val maintenanceConfig = config.maintenance
 
-  /** Acquire a DuckLake JDBC connection with all necessary extensions loaded and
-    * the DuckLake catalog attached as "ducklake".
+  /** Acquire a DuckLake JDBC connection with all necessary extensions loaded
+    * and the DuckLake catalog attached as "ducklake".
     */
   private def acquireConnection: ZIO[Scope, Throwable, Connection] =
     ZIO.acquireRelease(
@@ -77,39 +75,41 @@ class DuckLakeMaintenance(config: DuckLakeConfig):
 
   /** Run the full DuckLake maintenance sequence via the `CHECKPOINT` statement.
     *
-    * Step 1: Set `expire_older_than` on the catalog so that snapshot expiry and file cleanup
-    *         respect the configured retention window.
-    * Step 2: Run `CHECKPOINT`, which DuckLake expands internally into all 6 maintenance
-    *         functions: `ducklake_flush_inlined_data`, `ducklake_expire_snapshots`,
-    *         `ducklake_merge_adjacent_files`, `ducklake_rewrite_data_files`,
-    *         `ducklake_cleanup_old_files`, `ducklake_delete_orphaned_files`.
+    * Step 1: Set `expire_older_than` on the catalog so that snapshot expiry and
+    * file cleanup respect the configured retention window. Step 2: Run
+    * `CHECKPOINT`, which DuckLake expands internally into all 6 maintenance
+    * functions: `ducklake_flush_inlined_data`, `ducklake_expire_snapshots`,
+    * `ducklake_merge_adjacent_files`, `ducklake_rewrite_data_files`,
+    * `ducklake_cleanup_old_files`, `ducklake_delete_orphaned_files`.
     *
     * The connection is acquired and released within this call, keeping it safe
     * to call concurrently with the insert pipeline.
     */
   val runCheckpoint: ZIO[Any, Throwable, Unit] =
-    ZIO.scoped {
-      for
-        _ <- ZIO.logInfo(
-          s"Starting DuckLake maintenance (expire_older_than='${maintenanceConfig.expireOlderThan}')"
-        )
-        conn <- acquireConnection
-        _ <- ZIO.attemptBlocking {
-          val stmt = conn.createStatement()
-          try
-            // Step 1: Configure the retention window for snapshot expiry and file cleanup
-            stmt.execute(
-              s"CALL ducklake.set_option('expire_older_than', '${maintenanceConfig.expireOlderThan}')"
-            )
-            // Step 2: Run all 6 maintenance operations in one statement
-            stmt.execute("CHECKPOINT")
-          finally stmt.close()
-        }
-        _ <- ZIO.logInfo("DuckLake maintenance completed successfully")
-      yield ()
-    }.tapError(err =>
-      ZIO.logError(s"DuckLake maintenance failed: ${err.getMessage}")
-    )
+    ZIO
+      .scoped {
+        for
+          _ <- ZIO.logInfo(
+            s"Starting DuckLake maintenance (expire_older_than='${maintenanceConfig.expireOlderThan}')"
+          )
+          conn <- acquireConnection
+          _ <- ZIO.attemptBlocking {
+            val stmt = conn.createStatement()
+            try
+              // Step 1: Configure the retention window for snapshot expiry and file cleanup
+              stmt.execute(
+                s"CALL ducklake.set_option('expire_older_than', '${maintenanceConfig.expireOlderThan}')"
+              )
+              // Step 2: Run all 6 maintenance operations in one statement
+              stmt.execute("CHECKPOINT")
+            finally stmt.close()
+          }
+          _ <- ZIO.logInfo("DuckLake maintenance completed successfully")
+        yield ()
+      }
+      .tapError(err =>
+        ZIO.logError(s"DuckLake maintenance failed: ${err.getMessage}")
+      )
 
   /** Start the maintenance scheduler as a daemon fiber.
     *
@@ -117,8 +117,8 @@ class DuckLakeMaintenance(config: DuckLakeConfig):
     * Otherwise, forks a daemon fiber that runs the full maintenance sequence on
     * a fixed schedule. The first run is delayed by one full interval so startup
     * does not race with the sink's own catalog initialization. Errors in
-    * individual runs are logged and swallowed so a transient failure never kills
-    * the scheduler or the main pipeline.
+    * individual runs are logged and swallowed so a transient failure never
+    * kills the scheduler or the main pipeline.
     */
   def startScheduler(): ZIO[Any, Nothing, Unit] =
     if !maintenanceConfig.enabled then
@@ -133,6 +133,4 @@ class DuckLakeMaintenance(config: DuckLakeConfig):
             ZIO.logError(
               s"DuckLake maintenance run failed (will retry on next interval): ${err.getMessage}"
             )
-          )).forever
-          .forkDaemon
-          .unit
+          )).forever.forkDaemon.unit

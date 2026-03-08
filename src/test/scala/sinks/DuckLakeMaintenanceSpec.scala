@@ -8,8 +8,8 @@ import java.nio.file.{Files, Paths}
 object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
 
   /** Build a DuckLakeConfig backed by a DuckDB catalog stored at the given
-    * paths. Maintenance is always enabled with a very long interval so it
-    * does not fire automatically during tests.
+    * paths. Maintenance is always enabled with a very long interval so it does
+    * not fire automatically during tests.
     */
   private def makeConfig(
       catalogPath: String,
@@ -29,7 +29,8 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
     )
 
   /** Seed a DuckLake catalog+data directory with at least one insert so that
-    * the maintenance functions (merge, expire, cleanup) have something to work on.
+    * the maintenance functions (merge, expire, cleanup) have something to work
+    * on.
     */
   private def seedDuckLake(
       catalogPath: String,
@@ -99,7 +100,11 @@ object DuckLakeMaintenanceSpec extends ZIOSpecDefault:
       val run = for
         _ <- seedDuckLake(catalogPath, dataPath)
         // Use a short expiry string to exercise the set_option path
-        config = makeConfig(catalogPath, dataPath, expireOlderThan = "2 minutes")
+        config = makeConfig(
+          catalogPath,
+          dataPath,
+          expireOlderThan = "2 minutes"
+        )
         maintenance = DuckLakeMaintenance(config)
         _ <- maintenance.runCheckpoint
         _ <- ZIO.attempt {
