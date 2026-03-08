@@ -48,13 +48,26 @@ object CatalogType:
         )
     }
 
+case class DuckLakeMaintenanceConfig(
+    enabled: Boolean,
+    @name("interval-seconds")
+    intervalSeconds: Int,
+    @name("expire-older-than")
+    expireOlderThan: String
+)
+
+object DuckLakeMaintenanceConfig:
+  val descriptor: Config[DuckLakeMaintenanceConfig] =
+    deriveConfig[DuckLakeMaintenanceConfig]
+
 case class DuckLakeConfig(
     @name("catalog-type")
     catalogType: CatalogType,
     @name("catalog-path")
     catalogPath: String,
     @name("data-path")
-    dataPath: String
+    dataPath: String,
+    maintenance: DuckLakeMaintenanceConfig
 )
 
 object DuckLakeConfig:
