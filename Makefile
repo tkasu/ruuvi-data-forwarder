@@ -156,7 +156,7 @@ test-ducklake-sink: check-assembly create-test-data
 		if [ -d data/test_ducklake_files ]; then \
 			echo "✓ Data directory created: data/test_ducklake_files/" ; \
 			echo "Verifying data with DuckDB client..." ; \
-			ROW_COUNT=$$(duckdb :memory: -c "INSTALL ducklake; LOAD ducklake; ATTACH 'ducklake:sqlite:data/test_catalog.sqlite' AS my_ducklake (DATA_PATH 'data/test_ducklake_files/'); SELECT COUNT(*) FROM my_ducklake.telemetry;" | grep -E '^│[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | head -1) ; \
+			ROW_COUNT=$$(duckdb :memory: -c "INSTALL ducklake; LOAD ducklake; ATTACH 'ducklake:sqlite:$(CURDIR)/data/test_catalog.sqlite' AS my_ducklake (DATA_PATH '$(CURDIR)/data/test_ducklake_files/'); SELECT COUNT(*) FROM my_ducklake.telemetry;" | grep -E '^│[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | head -1) ; \
 			if [ "$$ROW_COUNT" = "2" ]; then \
 				echo "✓ Data verified: $$ROW_COUNT rows found in telemetry table" ; \
 			else \

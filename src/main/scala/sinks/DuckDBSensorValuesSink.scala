@@ -81,13 +81,17 @@ class DuckDBSensorValuesSink(
           // DuckLake mode: connect via DuckLake extension
           ducklakeConfig match
             case Some(config) =>
-              // Create parent directories for catalog and data paths
-              val catalogFilePath = Paths.get(config.catalogPath)
+              // Resolve catalog and data paths to absolute paths so the path
+              // stored in the DuckLake catalog metadata is portable regardless
+              // of which working directory opens the catalog later.
+              val catalogFilePath = Paths.get(config.catalogPath).toAbsolutePath
               Option(catalogFilePath.getParent)
                 .foreach(Files.createDirectories(_))
+              val absCatalogPath = catalogFilePath.toString
 
-              val dataFilePath = Paths.get(config.dataPath)
+              val dataFilePath = Paths.get(config.dataPath).toAbsolutePath
               Files.createDirectories(dataFilePath)
+              val absDataPath = dataFilePath.toString
 
               // Create a regular DuckDB connection first
               val conn = DriverManager.getConnection("jdbc:duckdb:")
@@ -113,11 +117,11 @@ class DuckDBSensorValuesSink(
               // Attach DuckLake database with alias "ducklake"
               val attachSQL = config.catalogType match
                 case CatalogType.DuckDB =>
-                  s"ATTACH 'ducklake:${config.catalogPath}' AS ducklake (DATA_PATH '${config.dataPath}')"
+                  s"ATTACH 'ducklake:$absCatalogPath' AS ducklake (DATA_PATH '$absDataPath')"
                 case CatalogType.SQLite =>
-                  s"ATTACH 'ducklake:sqlite:${config.catalogPath}' AS ducklake (DATA_PATH '${config.dataPath}')"
+                  s"ATTACH 'ducklake:sqlite:$absCatalogPath' AS ducklake (DATA_PATH '$absDataPath')"
                 case CatalogType.Postgres =>
-                  s"ATTACH 'ducklake:${config.catalogPath}' AS ducklake (DATA_PATH '${config.dataPath}')"
+                  s"ATTACH 'ducklake:$absCatalogPath' AS ducklake (DATA_PATH '$absDataPath')"
 
               val attachStmt = conn.createStatement()
               try attachStmt.execute(attachSQL)
@@ -203,6 +207,9 @@ class DuckDBSensorValuesSink(
           mac_address
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       """
+      // Wrap batch execution in an explicit transaction so rollback always has
+      // an active transaction to target (fixes "cannot rollback - no transaction is active" error).
+      conn.setAutoCommit(false)
       val pstmt = conn.prepareStatement(insertSQL)
       try
         telemetryBatch.foreach { telemetry =>
@@ -222,5 +229,13 @@ class DuckDBSensorValuesSink(
           pstmt.addBatch()
         }
         pstmt.executeBatch()
+        conn.commit()
+      catch
+        case e: Exception =>
+          try conn.rollback()
+          catch
+            case rollbackEx: Exception =>
+              e.addSuppressed(rollbackEx)
+          throw e
       finally pstmt.close()
     }

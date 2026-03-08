@@ -420,7 +420,7 @@ sink {
       ducklake {
         catalog-type = "sqlite"  # "duckdb", "sqlite", or "postgres"
         catalog-type = ${?RUUVI_DUCKDB_DUCKLAKE_CATALOG_TYPE}
-        catalog-path = "data/catalog.sqlite"
+        catalog-path = "data/ruuvidb.sqlite"
         catalog-path = ${?RUUVI_DUCKDB_DUCKLAKE_CATALOG_PATH}
         data-path = "data/ducklake_files/"
         data-path = ${?RUUVI_DUCKDB_DUCKLAKE_DATA_PATH}
