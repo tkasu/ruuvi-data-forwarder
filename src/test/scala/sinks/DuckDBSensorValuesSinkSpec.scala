@@ -910,7 +910,7 @@ object DuckDBSensorValuesSinkSpec extends ZIOSpecDefault:
       val ducklakeConfig = DuckLakeConfig(
         catalogType = CatalogType.DuckDB,
         catalogPath = relativeCatalogPath, // relative path
-        dataPath = relativeDataPath        // relative path
+        dataPath = relativeDataPath // relative path
       )
 
       val sink = DuckDBSensorValuesSink(
